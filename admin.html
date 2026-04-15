@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - BarberShop Dashboard</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .card-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans min-h-screen">
+
+    <!-- Sidebar + Conteúdo Principal -->
+    <div class="flex min-h-screen">
+
+        <!-- Sidebar -->
+        <aside class="w-64 bg-zinc-900 text-white fixed h-full overflow-y-auto">
+            <div class="p-6">
+                <div class="flex items-center space-x-2 mb-8">
+                    <i class="ph-fill ph-scissors text-amber-500 text-3xl"></i>
+                    <h1 class="text-xl font-bold">BARBER<span class="text-amber-500">ADMIN</span></h1>
+                </div>
+
+                <nav class="space-y-2">
+                    <button onclick="showSection('dashboard')" class="w-full text-left px-4 py-3 rounded-lg hover:bg-zinc-800 transition flex items-center space-x-3 bg-zinc-800">
+                        <i class="ph ph-squares-four text-xl"></i>
+                        <span>Dashboard</span>
+                    </button>
+                    <button onclick="showSection('agendamentos')" class="w-full text-left px-4 py-3 rounded-lg hover:bg-zinc-800 transition flex items-center space-x-3">
+                        <i class="ph ph-calendar text-xl"></i>
+                        <span>Agendamentos</span>
+                    </button>
+                    <button onclick="showSection('financeiro')" class="w-full text-left px-4 py-3 rounded-lg hover:bg-zinc-800 transition flex items-center space-x-3">
+                        <i class="ph ph-currency-dollar text-xl"></i>
+                        <span>Financeiro</span>
+                    </button>
+                    <button onclick="showSection('clientes')" class="w-full text-left px-4 py-3 rounded-lg hover:bg-zinc-800 transition flex items-center space-x-3">
+                        <i class="ph ph-users text-xl"></i>
+                        <span>Clientes</span>
+                    </button>
+                    <button onclick="showSection('assinaturas')" class="w-full text-left px-4 py-3 rounded-lg hover:bg-zinc-800 transition flex items-center space-x-3">
+                        <i class="ph ph-star text-xl"></i>
+                        <span>Assinaturas</span>
+                    </button>
+                </nav>
+            </div>
+
+            <div class="p-6 border-t border-zinc-800 mt-auto">
+                <a href="index.html" class="flex items-center space-x-3 text-zinc-400 hover:text-white transition">
+                    <i class="ph ph-house text-xl"></i>
+                    <span>Ir para o Site</span>
+                </a>
+            </div>
+        </aside>
+
+        <!-- Conteúdo Principal -->
+        <main class="ml-64 flex-1 p-8">
+
+            <!-- DASHBOARD -->
+            <section id="dashboard" class="fade-in">
+                <h2 class="text-3xl font-bold text-zinc-800 mb-6">Dashboard</h2>
+
+                <!-- Cards de Resumo -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                    <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-200 card-hover transition">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="bg-green-100 p-3 rounded-lg">
+                                <i class="ph-fill ph-currency-dollar text-green-600 text-2xl"></i>
+                            </div>
+                            <span class="text-xs text-green-600 font-semibold bg-green-50 px-2 py-1 rounded">Hoje</span>
+                        </div>
+                        <p class="text-gray-500 text-sm">Receita Hoje</p>
+                        <p id="receita-hoje" class="text-3xl font-bold text-zinc-800">R$ 0,00</p>
+                    </div>
+
+                    <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-200 card-hover transition">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="bg-blue-100 p-3 rounded-lg">
+                                <i class="ph-fill ph-calendar-check text-blue-600 text-2xl"></i>
+                            </div>
+                            <span class="text-xs text-blue-600 font-semibold bg-blue-50 px-2 py-1 rounded">Esta Semana</span>
+                        </div>
+                        <p class="text-gray-500 text-sm">Receita Semana</p>
+                        <p id="receita-semana" class="text-3xl font-bold text-zinc-800">R$ 0,00</p>
+                    </div>
+
+                    <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-200 card-hover transition">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="bg-purple-100 p-3 rounded-lg">
+                                <i class="ph-fill ph-wallet text-purple-600 text-2xl"></i>
+                            </div>
+                            <span class="text-xs text-purple-600 font-semibold bg-purple-50 px-2 py-1 rounded">Este Mês</span>
+                        </div>
+                        <p class="text-gray-500 text-sm">Receita Mês</p>
+                        <p id="receita-mes" class="text-3xl font-bold text-zinc-800">R$ 0,00</p>
+                    </div>
+
+                    <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-200 card-hover transition">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="bg-amber-100 p-3 rounded-lg">
+                                <i class="ph-fill ph-users text-amber-600 text-2xl"></i>
+                            </div>
+                            <span class="text-xs text-amber-600 font-semibold bg-amber-50 px-2 py-1 rounded">Total</span>
+                        </div>
+                        <p class="text-gray-500 text-sm">Agendamentos Hoje</p>
+                        <p id="agendamentos-hoje" class="text-3xl font-bold text-zinc-800">0</p>
+                    </div>
+                </div>
+
+                <!-- Gráfico e Tabela -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Gráfico de Receitas -->
+                    <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+                        <h3 class="text-lg font-bold text-zinc-800 mb-4 flex items-center">
+                            <i class="ph ph-chart-line-up text-amber-500 mr-2"></i>
+                            Receita dos Últimos 7 Dias
+                        </h3>
+                        <canvas id="grafico-receita"></canvas>
+                    </div>
+
+                    <!-- Próximos Agendamentos -->
+                    <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+                        <h3 class="text-lg font-bold text-zinc-800 mb-4 flex items-center">
+                            <i class="ph ph-clock text-amber-500 mr-2"></i>
+                            Próximos Agendamentos
+                        </h3>
+                        <div id="proximos-agendamentos" class="space-y-3">
+                            <!-- Preenchido via JS -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- AGENDAMENTOS -->
+            <section id="agendamentos" class="hidden fade-in">
+                <h2 class="text-3xl font-bold text-zinc-800 mb-6">Agendamentos</h2>
+
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div class="p-6 border-b border-gray-200 flex flex-wrap gap-4 items-center justify-between">
+                        <div class="flex gap-4">
+                            <input type="date" id="filtro-data" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500 outline-none">
+                            <select id="filtro-status" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500 outline-none">
+                                <option value="">Todos os Status</option>
+                                <option value="pendente">Pendentes</option>
+                                <option value="confirmado">Confirmados</option>
+                                <option value="realizado">Realizados</option>
+                                <option value="cancelado">Cancelados</option>
+                            </select>
+                        </div>
+                        <button onclick="carregarAgendamentos()" class="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition">
+                            <i class="ph ph-arrows-clockwise mr-2"></i>Atualizar
+                        </button>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data/Hora</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cliente</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Serviço</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Valor</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabela-agendamentos" class="divide-y divide-gray-200">
+                                <!-- Preenchido via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- FINANCEIRO -->
+            <section id="financeiro" class="hidden fade-in">
+                <h2 class="text-3xl font-bold text-zinc-800 mb-6">Financeiro</h2>
+
+                <!-- Tabs -->
+                <div class="flex gap-2 mb-6 border-b border-gray-200">
+                    <button onclick="showFinTab('dia')" id="tab-dia" class="px-4 py-2 border-b-2 border-amber-500 text-amber-600 font-semibold transition">Dia</button>
+                    <button onclick="showFinTab('semana')" id="tab-semana" class="px-4 py-2 text-gray-500 hover:text-gray-700 transition">Semana</button>
+                    <button onclick="showFinTab('mes')" id="tab-mes" class="px-4 py-2 text-gray-500 hover:text-gray-700 transition">Mês</button>
+                </div>
+
+                <!-- Conteúdo Dia -->
+                <div id="fin-dia" class="space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-6 text-white">
+                            <p class="text-green-100 text-sm mb-2">Total Recebido Hoje</p>
+                            <p id="fin-dia-total" class="text-4xl font-bold">R$ 0,00</p>
+                            <p id="fin-dia-qtd" class="text-green-100 mt-2">0 pagamentos</p>
+                        </div>
+                        <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+                            <p class="text-gray-500 text-sm mb-2">Receita por Agendamentos</p>
+                            <p id="fin-dia-agendamentos" class="text-3xl font-bold text-zinc-800">R$ 0,00</p>
+                        </div>
+                        <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+                            <p class="text-gray-500 text-sm mb-2">Receita por Assinaturas</p>
+                            <p id="fin-dia-assinaturas" class="text-3xl font-bold text-zinc-800">R$ 0,00</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                        <div class="px-6 py-4 border-b border-gray-200">
+                            <h3 class="font-bold text-zinc-800">Detalhamento por Forma de Pagamento</h3>
+                        </div>
+                        <table class="w-full">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Forma Pagto</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quantidade</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody id="fin-dia-tabela" class="divide-y divide-gray-200"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Conteúdo Semana -->
+                <div id="fin-semana" class="hidden space-y-6">
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                        <div class="px-6 py-4 border-b border-gray-200">
+                            <h3 class="font-bold text-zinc-800">Receitas por Semana (Últimas 12)</h3>
+                        </div>
+                        <table class="w-full">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Semana</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Agendamentos</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Assinaturas</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody id="fin-semana-tabela" class="divide-y divide-gray-200"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Conteúdo Mês -->
+                <div id="fin-mes" class="hidden space-y-6">
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                        <div class="px-6 py-4 border-b border-gray-200">
+                            <h3 class="font-bold text-zinc-800">Receitas por Mês (Últimos 12)</h3>
+                        </div>
+                        <table class="w-full">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mês</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Agendamentos</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Assinaturas</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody id="fin-mes-tabela" class="divide-y divide-gray-200"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- CLIENTES -->
+            <section id="clientes" class="hidden fade-in">
+                <h2 class="text-3xl font-bold text-zinc-800 mb-6">Clientes</h2>
+
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div class="p-6 border-b border-gray-200">
+                        <input type="text" id="busca-cliente" placeholder="Buscar cliente..." class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500 outline-none w-full md:w-96">
+                    </div>
+                    <table class="w-full">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nome</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Telefone</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cadastro</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabela-clientes" class="divide-y divide-gray-200"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- ASSINATURAS -->
+            <section id="assinaturas" class="hidden fade-in">
+                <h2 class="text-3xl font-bold text-zinc-800 mb-6">Assinaturas Clube BarberShop</h2>
+
+                <div class="bg-gradient-to-r from-amber-500 to-amber-600 rounded-xl p-6 text-white mb-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-amber-100 text-sm">Assinantes Ativos</p>
+                            <p id="total-assinantes" class="text-4xl font-bold mt-2">0</p>
+                        </div>
+                        <i class="ph-fill ph-star text-6xl text-amber-300"></i>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <table class="w-full">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cliente</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Telefone</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Início</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Próximo Vencimento</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Valor</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabela-assinaturas" class="divide-y divide-gray-200"></tbody>
+                    </table>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <script>
+        const API = 'http://localhost:3000/api';
+
+        // Navegação entre seções
+        function showSection(section) {
+            document.querySelectorAll('section').forEach(s => s.classList.add('hidden'));
+            document.getElementById(section).classList.remove('hidden');
+
+            // Carregar dados específicos
+            if (section === 'dashboard') carregarDashboard();
+            if (section === 'agendamentos') carregarAgendamentos();
+            if (section === 'financeiro') carregarFinanceiroDia();
+            if (section === 'clientes') carregarClientes();
+            if (section === 'assinaturas') carregarAssinaturas();
+        }
+
+        // Tabs do Financeiro
+        function showFinTab(tab) {
+            ['dia', 'semana', 'mes'].forEach(t => {
+                document.getElementById(`fin-${t}`).classList.add('hidden');
+                document.getElementById(`tab-${t}`).classList.remove('border-b-2', 'border-amber-500', 'text-amber-600');
+                document.getElementById(`tab-${t}`).classList.add('text-gray-500');
+            });
+            document.getElementById(`fin-${tab}`).classList.remove('hidden');
+            document.getElementById(`tab-${tab}`).classList.add('border-b-2', 'border-amber-500', 'text-amber-600');
+            document.getElementById(`tab-${tab}`).classList.remove('text-gray-500');
+
+            if (tab === 'dia') carregarFinanceiroDia();
+            if (tab === 'semana') carregarFinanceiroSemana();
+            if (tab === 'mes') carregarFinanceiroMes();
+        }
+
+        // Formatadores
+        const formatarMoeda = (valor) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor);
+        const formatarData = (data) => new Date(data + 'T00:00:00').toLocaleDateString('pt-BR');
+        const formatarDataHora = (data, hora) => {
+            const d = new Date(data + 'T' + hora);
+            return d.toLocaleDateString('pt-BR') + ' às ' + d.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
+        };
+
+        // Status badge
+        const statusBadge = (status) => {
+            const colors = {
+                'pendente': 'bg-yellow-100 text-yellow-800',
+                'confirmado': 'bg-blue-100 text-blue-800',
+                'realizado': 'bg-green-100 text-green-800',
+                'cancelado': 'bg-red-100 text-red-800',
+                'no_show': 'bg-gray-100 text-gray-800'
+            };
+            return `<span class="px-3 py-1 rounded-full text-xs font-semibold ${colors[status] || 'bg-gray-100'}">${status.toUpperCase()}</span>`;
+        };
+
+        // ==================== DASHBOARD ====================
+        async function carregarDashboard() {
+            try {
+                // Resumo geral
+                const resumo = await fetch(`${API}/financeiro/dashboard`).then(r => r.json());
+                document.getElementById('receita-hoje').textContent = formatarMoeda(resumo.hoje || 0);
+                document.getElementById('receita-semana').textContent = formatarMoeda(resumo.semana || 0);
+                document.getElementById('receita-mes').textContent = formatarMoeda(resumo.mes || 0);
+                document.getElementById('agendamentos-hoje').textContent = resumo.agendamentos_hoje || 0;
+
+                // Próximos agendamentos
+                const agendamentos = await fetch(`${API}/agendamentos?periodo=hoje`).then(r => r.json());
+                const container = document.getElementById('proximos-agendamentos');
+                container.innerHTML = agendamentos.slice(0, 5).map(a => `
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div>
+                            <p class="font-semibold text-zinc-800">${a.cliente_nome}</p>
+                            <p class="text-sm text-gray-500">${a.nome_servico}</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="font-semibold text-amber-600">${new Date(a.data_agendamento + 'T' + a.hora_agendamento).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</p>
+                            ${statusBadge(a.status)}
+                        </div>
+                    </div>
+                `).join('') || '<p class="text-gray-500 text-center py-4">Nenhum agendamento para hoje</p>';
+
+                // Gráfico dos últimos 7 dias
+                await carregarGraficoReceita();
+            } catch (err) {
+                console.error('Erro ao carregar dashboard:', err);
+            }
+        }
+
+        let graficoReceita;
+        async function carregarGraficoReceita() {
+            try {
+                const dadosSemana = await fetch(`${API}/financeiro/semana`).then(r => r.json());
+                const ultimas7 = dadosSemana.slice(0, 7).reverse();
+
+                const ctx = document.getElementById('grafico-receita');
+                if (graficoReceita) graficoReceita.destroy();
+
+                graficoReceita = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: ultimas7.map(d => formatarData(d.semana_inicio)),
+                        datasets: [{
+                            label: 'Receita',
+                            data: ultimas7.map(d => d.total),
+                            borderColor: '#f59e0b',
+                            backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                            fill: true,
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            y: { beginAtZero: true, grid: { color: '#f3f4f6' } },
+                            x: { grid: { display: false } }
+                        }
+                    }
+                });
+            } catch (err) {
+                console.error('Erro gráfico:', err);
+            }
+        }
+
+        // ==================== AGENDAMENTOS ====================
+        async function carregarAgendamentos() {
+            const data = document.getElementById('filtro-data').value;
+            const status = document.getElementById('filtro-status').value;
+
+            let url = `${API}/agendamentos?`;
+            if (data) url += `data=${data}&`;
+            if (status) url += `status=${status}`;
+
+            try {
+                const agendamentos = await fetch(url).then(r => r.json());
+                const tbody = document.getElementById('tabela-agendamentos');
+
+                tbody.innerHTML = agendamentos.map(a => `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4">${formatarDataHora(a.data_agendamento, a.hora_agendamento)}</td>
+                        <td class="px-6 py-4 font-medium">${a.cliente_nome}<br><span class="text-sm text-gray-500">${a.cliente_telefone}</span></td>
+                        <td class="px-6 py-4">${a.nome_servico}</td>
+                        <td class="px-6 py-4 font-semibold text-amber-600">${formatarMoeda(a.valor_pago)}</td>
+                        <td class="px-6 py-4">${statusBadge(a.status)}</td>
+                        <td class="px-6 py-4">
+                            ${a.status === 'pendente' ? `
+                                <button onclick="atualizarStatus(${a.id_agendamento}, 'confirmado')" class="text-blue-600 hover:text-blue-800 mr-2" title="Confirmar"><i class="ph-fill ph-check-circle text-xl"></i></button>
+                                <button onclick="atualizarStatus(${a.id_agendamento}, 'realizado')" class="text-green-600 hover:text-green-800 mr-2" title="Realizar"><i class="ph-fill ph-calendar-check text-xl"></i></button>
+                            ` : ''}
+                            ${a.status !== 'cancelado' ? `
+                                <button onclick="cancelarAgendamento(${a.id_agendamento})" class="text-red-600 hover:text-red-800" title="Cancelar"><i class="ph-fill ph-x-circle text-xl"></i></button>
+                            ` : ''}
+                        </td>
+                    </tr>
+                `).join('') || '<tr><td colspan="6" class="px-6 py-8 text-center text-gray-500">Nenhum agendamento encontrado</td></tr>';
+            } catch (err) {
+                console.error('Erro:', err);
+            }
+        }
+
+        async function atualizarStatus(id, status) {
+            await fetch(`${API}/agendamentos/${id}/status`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status })
+            });
+            carregarAgendamentos();
+        }
+
+        async function cancelarAgendamento(id) {
+            if (!confirm('Tem certeza que deseja cancelar este agendamento?')) return;
+            await fetch(`${API}/agendamentos/${id}`, { method: 'DELETE' });
+            carregarAgendamentos();
+        }
+
+        // ==================== FINANCEIRO ====================
+        async function carregarFinanceiroDia() {
+            try {
+                const dados = await fetch(`${API}/financeiro/dia`).then(r => r.json());
+                document.getElementById('fin-dia-total').textContent = formatarMoeda(dados.resumo.total);
+                document.getElementById('fin-dia-qtd').textContent = `${dados.resumo.quantidade} pagamentos`;
+                document.getElementById('fin-dia-agendamentos').textContent = formatarMoeda(dados.resumo.por_tipo.agendamento);
+                document.getElementById('fin-dia-assinaturas').textContent = formatarMoeda(dados.resumo.por_tipo.assinatura);
+
+                const tbody = document.getElementById('fin-dia-tabela');
+                tbody.innerHTML = dados.recebimentos.map(r => `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 capitalize font-medium">${r.forma_pagamento}</td>
+                        <td class="px-6 py-4">${r.quantidade}</td>
+                        <td class="px-6 py-4 font-semibold text-green-600">${formatarMoeda(r.total)}</td>
+                    </tr>
+                `).join('') || '<tr><td colspan="3" class="px-6 py-4 text-center text-gray-500">Nenhum recebimento hoje</td></tr>';
+            } catch (err) {
+                console.error('Erro:', err);
+            }
+        }
+
+        async function carregarFinanceiroSemana() {
+            const dados = await fetch(`${API}/financeiro/semana`).then(r => r.json());
+            const tbody = document.getElementById('fin-semana-tabela');
+            tbody.innerHTML = dados.map(d => `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4">${formatarData(d.semana_inicio)} - ${formatarData(d.semana_fim)}</td>
+                    <td class="px-6 py-4">${formatarMoeda(d.agendamentos)}</td>
+                    <td class="px-6 py-4">${formatarMoeda(d.assinaturas)}</td>
+                    <td class="px-6 py-4 font-bold text-green-600">${formatarMoeda(d.total)}</td>
+                </tr>
+            `).join('') || '<tr><td colspan="4" class="px-6 py-4 text-center text-gray-500">Nenhum recebimento registrado</td></tr>';
+        }
+
+        async function carregarFinanceiroMes() {
+            const dados = await fetch(`${API}/financeiro/mes`).then(r => r.json());
+            const tbody = document.getElementById('fin-mes-tabela');
+            tbody.innerHTML = dados.map(d => `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 font-medium">${d.nome_mes} ${d.ano}</td>
+                    <td class="px-6 py-4">${formatarMoeda(d.agendamentos_total)}</td>
+                    <td class="px-6 py-4">${formatarMoeda(d.assinaturas_total)}</td>
+                    <td class="px-6 py-4 font-bold text-green-600">${formatarMoeda(d.total)}</td>
+                </tr>
+            `).join('') || '<tr><td colspan="4" class="px-6 py-4 text-center text-gray-500">Nenhum recebimento registrado</td></tr>';
+        }
+
+        // ==================== CLIENTES ====================
+        async function carregarClientes() {
+            const clientes = await fetch(`${API}/clientes`).then(r => r.json());
+            const tbody = document.getElementById('tabela-clientes');
+            tbody.innerHTML = clientes.map(c => `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 font-medium">${c.nome}</td>
+                    <td class="px-6 py-4">${c.telefone}</td>
+                    <td class="px-6 py-4 text-gray-500">${c.email || '-'}</td>
+                    <td class="px-6 py-4 text-gray-500">${formatarData(c.data_cadastro)}</td>
+                </tr>
+            `).join('');
+        }
+
+        // ==================== ASSINATURAS ====================
+        async function carregarAssinaturas() {
+            const assinaturas = await fetch(`${API}/assinaturas`).then(r => r.json());
+            document.getElementById('total-assinantes').textContent = assinaturas.length;
+
+            const tbody = document.getElementById('tabela-assinaturas');
+            tbody.innerHTML = assinaturas.map(a => `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 font-medium">${a.cliente_nome}</td>
+                    <td class="px-6 py-4">${a.cliente_telefone}</td>
+                    <td class="px-6 py-4 text-gray-500">${formatarData(a.data_inicio)}</td>
+                    <td class="px-6 py-4 text-gray-500">${formatarData(a.proximo_vencimento)}</td>
+                    <td class="px-6 py-4 font-semibold text-amber-600">${formatarMoeda(a.valor_mensal)}</td>
+                </tr>
+            `).join('') || '<tr><td colspan="5" class="px-6 py-4 text-center text-gray-500">Nenhuma assinatura ativa</td></tr>';
+        }
+
+        // Inicializar
+        document.addEventListener('DOMContentLoaded', () => {
+            carregarDashboard();
+
+            // Filtros de agendamento
+            document.getElementById('filtro-data')?.addEventListener('change', carregarAgendamentos);
+            document.getElementById('filtro-status')?.addEventListener('change', carregarAgendamentos);
+
+            // Busca de clientes
+            document.getElementById('busca-cliente')?.addEventListener('input', async (e) => {
+                const termo = e.target.value.toLowerCase();
+                const clientes = await fetch(`${API}/clientes`).then(r => r.json());
+                const filtrados = clientes.filter(c => c.nome.toLowerCase().includes(termo) || c.telefone.includes(termo));
+
+                const tbody = document.getElementById('tabela-clientes');
+                tbody.innerHTML = filtrados.map(c => `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 font-medium">${c.nome}</td>
+                        <td class="px-6 py-4">${c.telefone}</td>
+                        <td class="px-6 py-4 text-gray-500">${c.email || '-'}</td>
+                        <td class="px-6 py-4 text-gray-500">${formatarData(c.data_cadastro)}</td>
+                    </tr>
+                `).join('') || '<tr><td colspan="4" class="px-6 py-4 text-center text-gray-500">Nenhum cliente encontrado</td></tr>';
+            });
+        });
+    </script>
+</body>
+</html>

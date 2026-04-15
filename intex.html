@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BarberShop - Agendamento e Pagamento</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
+    <script src="https://sdk.mercadopago.com/js/v2"></script>
+
+    <style>
+        .fade-in { animation: fadeIn 0.4s ease-in-out; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-zinc-50 font-sans min-h-screen flex flex-col text-zinc-900">
+
+    <header class="bg-zinc-900 text-white p-4 shadow-md sticky top-0 z-50">
+        <div class="max-w-4xl mx-auto flex justify-between items-center">
+            <div class="flex items-center space-x-2 cursor-pointer transition-transform hover:scale-105" onclick="navigate('home')">
+                <i class="ph-fill ph-scissors text-amber-500 text-3xl"></i>
+                <h1 class="text-2xl font-bold tracking-wider">BARBER<span class="text-amber-500">SHOP</span></h1>
+            </div>
+            <button onclick="navigate('agendar')" class="bg-amber-500 hover:bg-amber-600 text-zinc-900 font-bold py-2 px-5 rounded-md transition-colors">
+                Agendar
+            </button>
+        </div>
+    </header>
+
+    <main id="app-content" class="flex-grow"></main>
+
+    <footer class="bg-zinc-900 text-zinc-400 py-6 text-center border-t border-zinc-800">
+        <p class="text-sm">© 2026 BarberShop. Todos os direitos reservados.</p>
+    </footer>
+
+    <script>
+        // ==========================================
+        // ⚠️ ATENÇÃO: COLOQUE SUA CHAVE PÚBLICA AQUI
+        // ==========================================
+        const PUBLIC_KEY_MERCADO_PAGO = 'TEST-SUA-CHAVE-PUBLICA-AQUI'; // Ex: TEST-12345678-abcd...
+        
+        let mp;
+        try {
+            mp = new MercadoPago(PUBLIC_KEY_MERCADO_PAGO, { locale: 'pt-BR' });
+        } catch (e) {
+            console.error("Erro ao carregar Mercado Pago. Verifique sua Public Key.");
+        }
+
+        // --- Dados Simulados ---
+        const SERVICOS = [
+            { id: 1, nome: 'Corte Clássico', preco: 45.00, textoPreco: 'R$ 45,00', duracao: '45 min' },
+            { id: 2, nome: 'Barba Terapia', preco: 35.00, textoPreco: 'R$ 35,00', duracao: '30 min' },
+            { id: 3, nome: 'Corte + Barba', preco: 70.00, textoPreco: 'R$ 70,00', duracao: '1h 15 min' },
+            { id: 5, nome: '⭐ Assinante (Clube BarberShop)', preco: 0.00, textoPreco: 'Incluso no plano', duracao: 'Variável' },
+            { id: 6, nome: 'Assinar Clube BarberShop (Mensal)', preco: 130.00, textoPreco: 'R$ 130,00/mês', duracao: 'Acesso VIP' }
+        ];
+
+        let dadosAgendamentoTemp = {};
+
+        // --- Renderização: Tela Inicial ---
+        function renderHome() {
+            const servicosVitrine = SERVICOS.filter(s => s.id !== 5 && s.id !== 6);
+            const servicosHTML = servicosVitrine.map(s => `
+                <div class="bg-white p-5 rounded-lg shadow-sm border border-zinc-200 flex justify-between items-center hover:shadow-md transition-shadow">
+                    <div>
+                        <h4 class="font-bold text-lg text-zinc-800">${s.nome}</h4>
+                        <p class="text-zinc-500 text-sm flex items-center mt-1"><i class="ph ph-clock mr-1"></i> ${s.duracao}</p>
+                    </div>
+                    <div class="text-amber-600 font-bold text-xl">${s.textoPreco}</div>
+                </div>
+            `).join('');
+
+            return `
+                <div class="fade-in">
+                    <section class="bg-zinc-800 text-white py-16 px-4 text-center border-b border-zinc-700">
+                        <h2 class="text-4xl font-bold mb-4">Estilo e Tradição</h2>
+                        <button onclick="navigate('agendar')" class="bg-amber-500 hover:bg-amber-600 text-zinc-900 font-bold py-3 px-8 rounded-lg shadow-lg inline-flex items-center space-x-2 transition-transform hover:scale-105">
+                            <i class="ph ph-calendar-blank text-xl"></i><span>Marcar Horário</span>
+                        </button>
+                    </section>
+
+                    <section class="py-10 px-4 max-w-4xl mx-auto">
+                        <div class="bg-gradient-to-r from-zinc-900 to-zinc-800 rounded-2xl p-8 text-white shadow-xl border border-amber-500/30 flex flex-col md:flex-row items-center justify-between">
+                            <div class="mb-6 md:mb-0 md:pr-6">
+                                <h3 class="text-3xl font-bold mb-2 text-amber-400">Clube BarberShop</h3>
+                                <p class="text-zinc-300 mb-4">Corte e barba ilimitados durante todo o mês. Cancele quando quiser.</p>
+                            </div>
+                            <div class="text-center md:text-right flex-shrink-0 bg-zinc-900/50 p-6 rounded-xl border border-zinc-700">
+                                <span class="block text-4xl font-bold text-white mb-4">R$ 130<span class="text-lg text-zinc-500 font-normal">/mês</span></span>
+                                <button onclick="navigate('agendar')" class="w-full bg-amber-500 hover:bg-amber-600 text-zinc-900 font-bold py-2 px-6 rounded transition-colors">
+                                    Assinar Agora
+                                </button>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="pb-12 px-4 max-w-4xl mx-auto">
+                        <h3 class="text-2xl font-bold text-zinc-800 mb-6 flex items-center"><i class="ph-fill ph-scissors mr-2 text-amber-600"></i> Serviços Avulsos</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">${servicosHTML}</div>
+                    </section>
+                </div>
+            `;
+        }
+
+        // --- Renderização: Formulário de Agendamento ---
+        function renderAgendamento() {
+            const servicosOptions = SERVICOS.map(s => `<option value="${s.id}">${s.nome} - ${s.textoPreco}</option>`).join('');
+
+            return `
+                <div class="py-10 px-4 max-w-lg mx-auto fade-in w-full">
+                    <button onclick="navigate('home')" class="mb-4 text-zinc-500 hover:text-amber-600 flex items-center space-x-1 transition-colors font-medium">
+                        <i class="ph ph-arrow-left text-xl"></i><span>Voltar</span>
+                    </button>
+
+                    <div class="bg-white rounded-xl shadow-lg p-6 border border-zinc-200">
+                        <h2 class="text-2xl font-bold text-zinc-800 mb-6 border-b pb-4">Novo Agendamento</h2>
+                        
+                        <form id="form-agendamento" class="space-y-4">
+                            <div>
+                                <label class="block text-sm text-zinc-700 mb-1">Nome</label>
+                                <input type="text" name="nome" required class="w-full p-2 border rounded focus:ring-2 focus:ring-amber-500 outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-sm text-zinc-700 mb-1">Telefone (WhatsApp)</label>
+                                <input type="tel" name="telefone" required class="w-full p-2 border rounded focus:ring-2 focus:ring-amber-500 outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-sm text-zinc-700 mb-1">Serviço / Plano</label>
+                                <select name="servico" required class="w-full p-2 border rounded focus:ring-2 focus:ring-amber-500 outline-none">
+                                    <option value="">Selecione...</option>
+                                    ${servicosOptions}
+                                </select>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div><label class="block text-sm text-zinc-700 mb-1">Data</label><input type="date" name="data" required class="w-full p-2 border rounded"></div>
+                                <div><label class="block text-sm text-zinc-700 mb-1">Hora</label><input type="time" name="hora" required class="w-full p-2 border rounded"></div>
+                            </div>
+                            <button type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-zinc-900 font-bold py-3 px-4 rounded transition-colors mt-4">
+                                Avançar
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            `;
+        }
+
+        // --- Renderização: Tela de Pagamento Mercado Pago ---
+        function renderPagamento(servico) {
+            // Se o serviço for zero (já é assinante), pula o pagamento
+            if (servico.preco === 0) {
+                return `
+                    <div class="py-16 px-4 max-w-lg mx-auto fade-in text-center">
+                        <i class="ph-fill ph-check-circle text-green-500 text-6xl mb-4"></i>
+                        <h2 class="text-2xl font-bold text-zinc-800 mb-2">Agendamento Confirmado!</h2>
+                        <p class="text-zinc-500 mb-6">Como você é assinante do clube, seu horário já está garantido.</p>
+                        <button onclick="navigate('home')" class="bg-amber-500 text-zinc-900 font-bold py-2 px-6 rounded">Voltar ao Início</button>
+                    </div>
+                `;
+            }
+
+            // Se a chave pública for a "TEST-SUA-CHAVE...", o MP não vai renderizar. Mostramos um aviso amigável.
+            let avisoDesenvolvedor = '';
+            if (PUBLIC_KEY_MERCADO_PAGO.includes('SUA-CHAVE')) {
+                avisoDesenvolvedor = `
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded">
+                        <h3 class="text-red-800 font-bold flex items-center"><i class="ph-fill ph-warning mr-2"></i>Atenção Desenvolvedor</h3>
+                        <p class="text-red-700 text-sm mt-1">O formulário de pagamento não vai aparecer porque você não inseriu sua <strong>Public Key</strong> no código HTML (linha 47).</p>
+                    </div>
+                `;
+            }
+
+            return `
+                <div class="py-10 px-4 max-w-lg mx-auto fade-in w-full">
+                    <button onclick="navigate('agendar')" class="mb-4 text-zinc-500 hover:text-amber-600 flex items-center space-x-1 transition-colors font-medium">
+                        <i class="ph ph-arrow-left text-xl"></i><span>Voltar</span>
+                    </button>
+
+                    <div class="bg-white rounded-xl shadow-lg p-6 border border-zinc-200">
+                        ${avisoDesenvolvedor}
+                        
+                        <div class="border-b pb-4 mb-6">
+                            <h2 class="text-xl font-bold text-zinc-800">Finalizar Reserva</h2>
+                            <p class="text-zinc-500 text-sm mt-1">Total a pagar: <span class="font-bold text-amber-600 text-lg ml-1">R$ ${servico.preco.toFixed(2)}</span></p>
+                        </div>
+                        
+                        <div id="paymentBrick_container"></div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // --- Navegação e Controle ---
+        const contentDiv = document.getElementById('app-content');
+
+        function navigate(view) {
+            if (view === 'home') {
+                contentDiv.innerHTML = renderHome();
+            } 
+            else if (view === 'agendar') {
+                contentDiv.innerHTML = renderAgendamento();
+                
+                document.getElementById('form-agendamento').addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    const formData = new FormData(e.target);
+                    dadosAgendamentoTemp = Object.fromEntries(formData);
+                    
+                    const servicoEscolhido = SERVICOS.find(s => s.id == dadosAgendamentoTemp.servico);
+                    
+                    // Se for assinante (preço 0), aprova direto. Se não, vai para pagamento.
+                    navigate('pagar');
+                    if (servicoEscolhido.preco > 0) {
+                        iniciarMercadoPago(servicoEscolhido.preco);
+                    }
+                });
+            } 
+            else if (view === 'pagar') {
+                const servicoEscolhido = SERVICOS.find(s => s.id == dadosAgendamentoTemp.servico);
+                contentDiv.innerHTML = renderPagamento(servicoEscolhido);
+            }
+            window.scrollTo(0, 0);
+        }
+
+        // --- Lógica de Criação do Mercado Pago ---
+        async function iniciarMercadoPago(valor) {
+            if (!mp || PUBLIC_KEY_MERCADO_PAGO.includes('SUA-CHAVE')) return; // Aborta se a chave for inválida
+
+            const bricksBuilder = mp.bricks();
+            
+            await bricksBuilder.create("payment", "paymentBrick_container", {
+                initialization: { amount: valor },
+                customization: {
+                    paymentMethods: { ticket: "all", creditCard: "all", pix: "all" },
+                },
+                callbacks: {
+                    onReady: () => { console.log('Checkout pronto!'); },
+                    onSubmit: ({ selectedPaymentMethod, formData }) => {
+                        return new Promise((resolve, reject) => {
+                            
+                            // Tenta enviar para o seu Node.js (se estiver rodando)
+                            fetch("http://localhost:3000/process

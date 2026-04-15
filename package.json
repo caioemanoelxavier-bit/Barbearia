@@ -1,0 +1,26 @@
+{
+  "name": "barber-shop-sistema",
+  "version": "1.0.0",
+  "description": "Sistema completo para Barbearia - Agendamentos e Controle Financeiro",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "setup": "node setup_db.js"
+  },
+  "keywords": [
+    "barbearia",
+    "agendamento",
+    "controle-financeiro",
+    "sqlite",
+    "express"
+  ],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.22.1",
+    "sqlite3": "^5.1.7"
+  }
+}

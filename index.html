@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BarberShop - Agendamento Online</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <style>
+        .fade-in { animation: fadeIn 0.4s ease-in-out; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .service-card {
+            transition: all 0.3s ease;
+        }
+        .service-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 24px rgba(0,0,0,0.1);
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 16px 24px;
+            border-radius: 8px;
+            z-index: 9999;
+            animation: slideIn 0.3s ease-out;
+        }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        .toast.success { background: #10b981; color: white; }
+        .toast.error { background: #ef4444; color: white; }
+    </style>
+</head>
+<body class="bg-gray-50 font-sans min-h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="bg-zinc-900 text-white p-4 shadow-lg sticky top-0 z-50">
+        <div class="max-w-6xl mx-auto flex justify-between items-center">
+            <div class="flex items-center space-x-3 cursor-pointer transition-transform hover:scale-105" onclick="navigate('home')">
+                <i class="ph-fill ph-scissors text-amber-500 text-4xl"></i>
+                <div>
+                    <h1 class="text-2xl font-bold tracking-wider">BARBER<span class="text-amber-500">SHOP</span></h1>
+                    <p class="text-xs text-zinc-400">Estilo e Tradição</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-4">
+                <a href="admin.html" class="text-zinc-400 hover:text-white transition text-sm flex items-center">
+                    <i class="ph ph-lock-key mr-1"></i> Admin
+                </a>
+                <button onclick="navigate('agendar')" class="bg-amber-500 hover:bg-amber-600 text-zinc-900 font-bold py-2 px-6 rounded-lg transition-all hover:shadow-lg">
+                    Agendar
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Conteúdo Principal -->
+    <main id="app-content" class="flex-grow"></main>
+
+    <!-- Footer -->
+    <footer class="bg-zinc-900 text-zinc-400 py-8 text-center border-t border-zinc-800 mt-auto">
+        <div class="max-w-6xl mx-auto">
+            <div class="flex items-center justify-center space-x-2 mb-4">
+                <i class="ph-fill ph-scissors text-amber-500 text-2xl"></i>
+                <span class="text-xl font-bold text-white">BARBER<span class="text-amber-500">SHOP</span></span>
+            </div>
+            <p class="text-sm mb-2">© 2026 BarberShop. Todos os direitos reservados.</p>
+            <p class="text-xs text-zinc-500">Qualidade e estilo que você merece.</p>
+        </div>
+    </footer>
+
+    <!-- Modal de Confirmação -->
+    <div id="modal-confirmacao" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl fade-in">
+            <div class="text-center">
+                <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="ph-fill ph-check-circle text-green-500 text-5xl"></i>
+                </div>
+                <h3 class="text-2xl font-bold text-zinc-800 mb-2">Agendamento Confirmado!</h3>
+                <p class="text-zinc-500 mb-6" id="modal-mensagem">Seu horário está reservado.</p>
+
+                <div class="bg-gray-50 rounded-xl p-4 mb-6 text-left">
+                    <p class="text-sm text-zinc-500 mb-2">Detalhes do agendamento:</p>
+                    <div id="modal-detalhes" class="space-y-1"></div>
+                </div>
+
+                <button onclick="fecharModal()" class="w-full bg-amber-500 hover:bg-amber-600 text-zinc-900 font-bold py-3 px-6 rounded-lg transition">
+                    Voltar ao Início
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API = 'http://localhost:3000/api';
+
+        // Dados dos serviços (cache inicial)
+        let servicosCache = [];
+
+        // Dados temporários do agendamento
+        let agendamentoTemp = {
+            cliente: null,
+            servico: null,
+            data: null,
+            hora: null,
+            formaPagamento: 'pix'
+        };
+
+        // ==================== NAVEGAÇÃO ====================
+        function navigate(view) {
+            const contentDiv = document.getElementById('app-content');
+            contentDiv.innerHTML = '';
+
+            switch(view) {
+                case 'home':
+                    contentDiv.innerHTML = renderHome();
+                    break;
+                case 'agendar':
+                    contentDiv.innerHTML = renderAgendamento();
+                    carregarServicos();
+                    break;
+                case 'confirmar':
+                    contentDiv.innerHTML = renderConfirmacao();
+                    break;
+            }
+
+            window.scrollTo(0, 0);
+        }
+
+        // ==================== RENDER: HOME ====================
+        function renderHome() {
+            return `
+                <div class="fade-in">
+                    <!-- Hero Section -->
+                    <section class="bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-900 text-white py-20 px-4">
+                        <div class="max-w-4xl mx-auto text-center">
+                            <div class="inline-flex items-center space-x-2 bg-amber-500/20 text-amber-400 px-4 py-2 rounded-full mb-6">
+                                <i class="ph-fill ph-star"></i>
+                                <span class="text-sm font-semibold">Melhor barbearia da cidade</span>
+                            </div>
+                            <h2 class="text-5xl md:text-6xl font-bold mb-6">Seu estilo, nossa <span class="text-amber-500">paixão</span></h2>
+                            <p class="text-xl text-zinc-400 mb-8 max-w-2xl mx-auto">
+                                Profissionais experientes, ambiente premium e o melhor atendimento da região.
+                                Agende seu horário em menos de 1 minuto.
+                            </p>
+                            <div class="flex flex-wrap justify-center gap-4">
+                                <button onclick="navigate('agendar')" class="bg-amber-500 hover:bg-amber-600 text-zinc-900 font-bold py-4 px-8 rounded-xl shadow-lg inline-flex items-center space-x-2 transition-all hover:scale-105">
+                                    <i class="ph-fill ph-calendar-check text-xl"></i>
+                                    <span>Agendar Horário</span>
+                                </button>
+                                <a href="#servicos" class="bg-zinc-700 hover:bg-zinc-600 text-white font-bold py-4 px-8 rounded-xl inline-flex items-center space-x-2 transition">
+                                    <i class="ph-fill ph-scissors text-xl"></i>
+                                    <span>Ver Serviços</span>
+                                </a>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Clube BarberShop -->
+                    <section class="py-12 px-4">
+                        <div class="max-w-5xl mx-auto">
+                            <div class="bg-gradient-to-r from-amber-500 to-amber-600 rounded-3xl p-8 md:p-10 text-white shadow-2xl flex flex-col md:flex-row items-center justify-between">
+                                <div class="mb-6 md:mb-0 md:pr-8">
+                                    <div class="flex items-center space-x-2 mb-3">
+                                        <i class="ph-fill ph-star text-3xl"></i>
+                                        <h3 class="text-3xl font-bold">Clube BarberShop</h3>
+                                    </div>
+                                    <p class="text-amber-100 mb-4 text-lg">Corte e barba ilimitados durante todo o mês. Cancele quando quiser.</p>
+                                    <ul class="space-y-2 text-amber-100">
+                                        <li class="flex items-center"><i class="ph-fill ph-check-circle text-green-400 mr-2"></i>Cortes ilimitados</li>
+                                        <li class="flex items-center"><i class="ph-fill ph-check-circle text-green-400 mr-2"></i>Barba à vontade</li>
+                                        <li class="flex items-center"><i class="ph-fill ph-check-circle text-green-400 mr-2"></i>Sem fidelidade</li>
+                                        <li class="flex items-center"><i class="ph-fill ph-check-circle text-green-400 mr-2"></i>Agendamento prioritário</li>
+                                    </ul>
+                                </div>
+                                <div class="text-center md:text-right flex-shrink-0 bg-white/10 backdrop-blur p-8 rounded-2xl border border-white/20">
+                                    <span class="block text-5xl font-bold text-white mb-2">R$ 130</span>
+                                    <span class="text-amber-200">por mês</span>
+                                    <button onclick="iniciarAgendamentoAssinatura()" class="w-full mt-4 bg-white text-amber-600 hover:bg-amber-50 font-bold py-3 px-6 rounded-xl transition">
+                                        Assinar Agora
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Serviços -->
+                    <section id="servicos" class="py-12 px-4 bg-white">
+                        <div class="max-w-5xl mx-auto">
+                            <div class="text-center mb-10">
+                                <h3 class="text-3xl font-bold text-zinc-800 mb-2">Nossos Serviços</h3>
+                                <p class="text-zinc-500">Escolha o serviço perfeito para você</p>
+                            </div>
+                            <div id="servicos-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                <!-- Carregado via JS -->
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Diferenciais -->
+                    <section class="py-16 px-4">
+                        <div class="max-w-5xl mx-auto">
+                            <div class="text-center mb-10">
+                                <h3 class="text-3xl font-bold text-zinc-800 mb-2">Por que nos escolher?</h3>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                                <div class="text-center p-6">
+                                    <div class="w-16 h-16 bg-amber-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                                        <i class="ph-fill ph-clock text-amber-600 text-3xl"></i>
+                                    </div>
+                                    <h4 class="font-bold text-lg mb-2">Pontualidade</h4>
+                                    <p class="text-zinc-500">Seu horário é respeitado. Sem esperas desnecessárias.</p>
+                                </div>
+                                <div class="text-center p-6">
+                                    <div class="w-16 h-16 bg-amber-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                                        <i class="ph-fill ph-medal text-amber-600 text-3xl"></i>
+                                    </div>
+                                    <h4 class="font-bold text-lg mb-2">Qualidade Premium</h4>
+                                    <p class="text-zinc-500">Produtos de primeira linha e profissionais experientes.</p>
+                                </div>
+                                <div class="text-center p-6">
+                                    <div class="w-16 h-16 bg-amber-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                                        <i class="ph-fill ph-wallet text-amber-600 text-3xl"></i>
+                                    </div>
+                                    <h4 class="font-bold text-lg mb-2">Preço Justo</h4>
+                                    <p class="text-zinc-500">Serviços de qualidade com preços que cabem no bolso.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            `;
+        }
+
+        // ==================== RENDER: AGENDAMENTO ====================
+        function renderAgendamento() {
+            return `
+                <div class="py-10 px-4 max-w-2xl mx-auto fade-in w-full">
+                    <button onclick="navigate('home')" class="mb-6 text-zinc-500 hover:text-amber-600 flex items-center space-x-2 transition">
+                        <i class="ph ph-arrow-left text-xl"></i>
+                        <span>Voltar ao início</span>
+                    </button>
+
+                    <div class="bg-white rounded-2xl shadow-xl p-8 border border-gray-200">
+                        <div class="text-center mb-8">
+                            <h2 class="text-3xl font-bold text-zinc-800 mb-2">Agendar Horário</h2>
+                            <p class="text-zinc-500">Preencha os dados abaixo para reservar seu horário</p>
+                        </div>
+
+                        <form id="form-agendamento" class="space-y-6">
+                            <!-- Dados do Cliente -->
+                            <div class="border-b pb-6">
+                                <h3 class="font-bold text-lg text-zinc-700 mb-4 flex items-center">
+                                    <i class="ph-fill ph-user text-amber-500 mr-2"></i>
+                                    Seus Dados
+                                </h3>
+                                <div class="space-y-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-zinc-700 mb-2">Nome Completo</label>
+                                        <input type="text" name="nome" required class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none transition" placeholder="João Silva">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-zinc-700 mb-2">Telefone (WhatsApp)</label>
+                                        <input type="tel" name="telefone" required class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none transition" placeholder="(11) 99999-9999">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-zinc-700 mb-2">Email (opcional)</label>
+                                        <input type="email" name="email" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none transition" placeholder="joao@email.com">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Serviço -->
+                            <div class="border-b pb-6">
+                                <h3 class="font-bold text-lg text-zinc-700 mb-4 flex items-center">
+                                    <i class="ph-fill ph-scissors text-amber-500 mr-2"></i>
+                                    Serviço
+                                </h3>
+                                <select name="servico" required class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none transition" id="select-servico">
+                                    <option value="">Selecione o serviço...</option>
+                                </select>
+                                <div id="servico-info" class="mt-3 hidden">
+                                    <p class="text-sm text-zinc-600"><span class="font-semibold">Duração:</span> <span id="servico-duracao"></span></p>
+                                    <p class="text-sm text-amber-600 font-bold"><span class="font-semibold">Valor:</span> <span id="servico-preco"></span></p>
+                                </div>
+                            </div>
+
+                            <!-- Data e Hora -->
+                            <div>
+                                <h3 class="font-bold text-lg text-zinc-700 mb-4 flex items-center">
+                                    <i class="ph-fill ph-calendar text-amber-500 mr-2"></i>
+                                    Data e Hora
+                                </h3>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-zinc-700 mb-2">Data</label>
+                                        <input type="date" name="data" required min="${new Date().toISOString().split('T')[0]}" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none transition">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-zinc-700 mb-2">Hora</label>
+                                        <input type="time" name="hora" required min="09:00" max="20:00" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none transition">
+                                    </div>
+                                </div>
+                                <p class="text-xs text-zinc-500 mt-2"><i class="ph ph-info mr-1"></i>Horário de funcionamento: 09:00 às 20:00</p>
+                            </div>
+
+                            <!-- Forma de Pagamento -->
+                            <div class="border-t pt-6">
+                                <h3 class="font-bold text-lg text-zinc-700 mb-4 flex items-center">
+                                    <i class="ph-fill ph-credit-card text-amber-500 mr-2"></i>
+                                    Forma de Pagamento
+                                </h3>
+                                <div class="grid grid-cols-3 gap-3">
+                                    <label class="cursor-pointer">
+                                        <input type="radio" name="pagamento" value="pix" checked class="peer sr-only">
+                                        <div class="border-2 border-gray-200 rounded-xl p-4 text-center peer-checked:border-amber-500 peer-checked:bg-amber-50 transition">
+                                            <i class="ph-fill ph-qr-code text-2xl mb-1"></i>
+                                            <p class="text-sm font-medium">PIX</p>
+                                        </div>
+                                    </label>
+                                    <label class="cursor-pointer">
+                                        <input type="radio" name="pagamento" value="dinheiro" class="peer sr-only">
+                                        <div class="border-2 border-gray-200 rounded-xl p-4 text-center peer-checked:border-amber-500 peer-checked:bg-amber-50 transition">
+                                            <i class="ph-fill ph-money text-2xl mb-1"></i>
+                                            <p class="text-sm font-medium">Dinheiro</p>
+                                        </div>
+                                    </label>
+                                    <label class="cursor-pointer">
+                                        <input type="radio" name="pagamento" value="credito" class="peer sr-only">
+                                        <div class="border-2 border-gray-200 rounded-xl p-4 text-center peer-checked:border-amber-500 peer-checked:bg-amber-50 transition">
+                                            <i class="ph-fill ph-credit-card text-2xl mb-1"></i>
+                                            <p class="text-sm font-medium">Cartão</p>
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <button type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-zinc-900 font-bold py-4 px-6 rounded-xl shadow-lg transition-all hover:scale-[1.02] flex items-center justify-center space-x-2">
+                                <i class="ph-fill ph-check-circle text-xl"></i>
+                                <span>Confirmar Agendamento</span>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            `;
+        }
+
+        // ==================== RENDER: CONFIRMAÇÃO ====================
+        function renderConfirmacao() {
+            return `
+                <div class="py-16 px-4 max-w-lg mx-auto fade-in text-center">
+                    <div class="bg-white rounded-2xl shadow-xl p-8 border border-gray-200">
+                        <div class="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                            <i class="ph-fill ph-check-circle text-green-500 text-6xl"></i>
+                        </div>
+                        <h2 class="text-3xl font-bold text-zinc-800 mb-4">Agendamento Confirmado!</h2>
+                        <p class="text-zinc-500 mb-8">Seu horário está reservado. Estamos te esperando!</p>
+
+                        <div class="bg-gray-50 rounded-xl p-6 mb-8 text-left">
+                            <h3 class="font-bold text-zinc-700 mb-4">Resumo do Agendamento</h3>
+                            <div class="space-y-3 text-sm">
+                                <div class="flex justify-between">
+                                    <span class="text-zinc-500">Cliente</span>
+                                    <span class="font-medium">${agendamentoTemp.cliente?.nome || '-'}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-zinc-500">Serviço</span>
+                                    <span class="font-medium">${agendamentoTemp.servico?.nome_servico || '-'}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-zinc-500">Data</span>
+                                    <span class="font-medium">${agendamentoTemp.data ? new Date(agendamentoTemp.data + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-zinc-500">Hora</span>
+                                    <span class="font-medium">${agendamentoTemp.hora || '-'}</span>
+                                </div>
+                                <div class="flex justify-between border-t pt-3 mt-3">
+                                    <span class="text-zinc-500">Valor</span>
+                                    <span class="font-bold text-amber-600">${agendamentoTemp.servico ? formatarMoeda(agendamentoTemp.servico.preco) : '-'}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button onclick="navigate('home')" class="w-full bg-amber-500 hover:bg-amber-600 text-zinc-900 font-bold py-3 px-6 rounded-xl transition">
+                            Voltar ao Início
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // ==================== FUNÇÕES AUXILIARES ====================
+        function formatarMoeda(valor) {
+            return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor);
+        }
+
+        function showToast(mensagem, tipo = 'success') {
+            const toast = document.createElement('div');
+            toast.className = `toast ${tipo}`;
+            toast.innerHTML = `<i class="ph-fill ${tipo === 'success' ? 'ph-check-circle' : 'ph-x-circle'} mr-2"></i>${mensagem}`;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 4000);
+        }
+
+        // ==================== CARREGAR SERVIÇOS ====================
+        async function carregarServicos() {
+            try {
+                const response = await fetch(`${API}/servicos`);
+                servicosCache = await response.json();
+
+                const select = document.getElementById('select-servico');
+                if (select) {
+                    select.innerHTML = '<option value="">Selecione o serviço...</option>' +
+                        servicosCache.map(s => `<option value="${s.id_servico}" data-preco="${s.preco}" data-duracao="${s.duracao_minutos}">${s.nome_servico} - ${formatarMoeda(s.preco)}</option>`).join('');
+
+                    // Preencher grid da home
+                    const grid = document.getElementById('servicos-grid');
+                    if (grid) {
+                        grid.innerHTML = servicosCache.map(s => `
+                            <div class="service-card bg-gray-50 rounded-xl p-6 border border-gray-200 hover:border-amber-500 cursor-pointer" onclick="selecionarServicoHome(${s.id_servico})">
+                                <div class="flex justify-between items-start mb-4">
+                                    <div class="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center">
+                                        <i class="ph-fill ph-scissors text-amber-600 text-2xl"></i>
+                                    </div>
+                                    <span class="text-amber-600 font-bold text-lg">${formatarMoeda(s.preco)}</span>
+                                </div>
+                                <h4 class="font-bold text-lg text-zinc-800 mb-2">${s.nome_servico}</h4>
+                                <p class="text-zinc-500 text-sm mb-4">${s.descricao || 'Serviço profissional'}</p>
+                                <div class="flex items-center text-sm text-zinc-500">
+                                    <i class="ph-fill ph-clock mr-2"></i>
+                                    ${s.duracao_minutos} minutos
+                                </div>
+                            </div>
+                        `).join('');
+                    }
+                }
+            } catch (err) {
+                console.error('Erro ao carregar serviços:', err);
+                showToast('Erro ao carregar serviços. Verifique se o servidor está rodando.', 'error');
+            }
+        }
+
+        function selecionarServicoHome(id) {
+            const servico = servicosCache.find(s => s.id_servico === id);
+            if (servico) {
+                agendamentoTemp.servico = servico;
+                navigate('agendar');
+                // Preencher o select
+                setTimeout(() => {
+                    const select = document.getElementById('select-servico');
+                    if (select) select.value = id.toString();
+                }, 100);
+            }
+        }
+
+        // ==================== INICIAR AGENDAMENTO (ASSINATURA) ====================
+        function iniciarAgendamentoAssinatura() {
+            navigate('agendar');
+            setTimeout(() => {
+                const select = document.getElementById('select-servico');
+                if (select) {
+                    // Encontrar serviço de assinatura
+                    const assinatura = servicosCache.find(s => s.nome_servico.includes('Assinar') || s.nome_servico.includes('Clube'));
+                    if (assinatura) {
+                        select.value = assinatura.id_servico.toString();
+                        selecionarServico(select);
+                    }
+                }
+            }, 100);
+        }
+
+        // ==================== SUBMIT DO FORMULÁRIO ====================
+        document.addEventListener('DOMContentLoaded', () => {
+            navigate('home');
+            carregarServicos();
+
+            // Listener do select de serviço
+            document.addEventListener('change', (e) => {
+                if (e.target.id === 'select-servico') {
+                    selecionarServico(e.target);
+                }
+            });
+
+            // Submit do formulário
+            document.addEventListener('submit', async (e) => {
+                if (e.target.id === 'form-agendamento') {
+                    e.preventDefault();
+                    await submitAgendamento(e.target);
+                }
+            });
+        });
+
+        function selecionarServico(select) {
+            const option = select.options[select.selectedIndex];
+            if (!option.value) {
+                document.getElementById('servico-info')?.classList.add('hidden');
+                return;
+            }
+
+            const preco = option.dataset.preco;
+            const duracao = option.dataset.duracao;
+
+            document.getElementById('servico-duracao').textContent = `${duracao} min`;
+            document.getElementById('servico-preco').textContent = formatarMoeda(preco);
+            document.getElementById('servico-info')?.classList.remove('hidden');
+        }
+
+        async function submitAgendamento(form) {
+            const formData = new FormData(form);
+            const servicoId = parseInt(formData.get('servico'));
+            const servico = servicosCache.find(s => s.id_servico === servicoId);
+
+            if (!servico) {
+                showToast('Selecione um serviço válido', 'error');
+                return;
+            }
+
+            // Salvar dados temporários
+            agendamentoTemp = {
+                cliente: {
+                    nome: formData.get('nome'),
+                    telefone: formData.get('telefone'),
+                    email: formData.get('email')
+                },
+                servico: servico,
+                data: formData.get('data'),
+                hora: formData.get('hora'),
+                formaPagamento: formData.get('pagamento')
+            };
+
+            try {
+                // 1. Verificar se cliente já existe
+                let clienteResponse = await fetch(`${API}/clientes/buscar/${agendamentoTemp.cliente.telefone.replace(/\D/g, '')}`);
+                let cliente = await clienteResponse.json();
+
+                // 2. Se não existe, criar
+                if (!cliente) {
+                    const createResponse = await fetch(`${API}/clientes`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(agendamentoTemp.cliente)
+                    });
+                    cliente = await createResponse.json();
+                }
+
+                // 3. Criar agendamento
+                const agendamentoData = {
+                    cliente_id: cliente.id_cliente || cliente.id,
+                    servico_id: servicoId,
+                    data: agendamentoTemp.data,
+                    hora: agendamentoTemp.hora,
+                    valor_total: servico.preco,
+                    forma_pagamento: agendamentoTemp.formaPagamento,
+                    observacoes: ''
+                };
+
+                const response = await fetch(`${API}/agendamentos`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(agendamentoData)
+                });
+
+                const resultado = await response.json();
+
+                if (response.ok) {
+                    mostrarConfirmacao();
+                } else {
+                    showToast(resultado.erro || 'Erro ao criar agendamento', 'error');
+                }
+            } catch (err) {
+                console.error('Erro:', err);
+                showToast('Erro de conexão. Verifique se o servidor está rodando.', 'error');
+            }
+        }
+
+        function mostrarConfirmacao() {
+            const modal = document.getElementById('modal-confirmacao');
+            const detalhes = document.getElementById('modal-detalhes');
+            const mensagem = document.getElementById('modal-mensagem');
+
+            detalhes.innerHTML = `
+                <p><strong>Cliente:</strong> ${agendamentoTemp.cliente.nome}</p>
+                <p><strong>Serviço:</strong> ${agendamentoTemp.servico.nome_servico}</p>
+                <p><strong>Data:</strong> ${new Date(agendamentoTemp.data + 'T00:00:00').toLocaleDateString('pt-BR')}</p>
+                <p><strong>Hora:</strong> ${agendamentoTemp.hora}</p>
+                <p><strong>Valor:</strong> ${formatarMoeda(agendamentoTemp.servico.preco)}</p>
+            `;
+
+            mensagem.textContent = `Seu horário está reservado para ${new Date(agendamentoTemp.data + 'T00:00:00').toLocaleDateString('pt-BR')} às ${agendamentoTemp.hora}.`;
+
+            modal.classList.remove('hidden');
+        }
+
+        function fecharModal() {
+            document.getElementById('modal-confirmacao').classList.add('hidden');
+            navigate('home');
+        }
+    </script>
+</body>
+</html>
