@@ -1,0 +1,1300 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>BarberShop - Sistema Completo</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+  <style>
+    body {
+      background:
+        radial-gradient(circle at top left, rgba(245, 158, 11, .08), transparent 32rem),
+        #f8fafc;
+    }
+
+    .glass-card {
+      background: rgba(255,255,255,.94);
+      border: 1px solid rgba(228,228,231,.9);
+      box-shadow: 0 18px 45px rgba(15,23,42,.08);
+    }
+
+    .toast {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      z-index: 9999;
+      color: #fff;
+      padding: 14px 18px;
+      border-radius: 16px;
+      font-weight: 800;
+      box-shadow: 0 10px 30px rgba(0,0,0,.25);
+    }
+
+    .success { background: #10b981; }
+    .error { background: #ef4444; }
+    .info { background: #334155; }
+
+    .input-ui {
+      width: 100%;
+      border: 1px solid #d4d4d8;
+      border-radius: 1rem;
+      padding: .85rem 1rem;
+      outline: none;
+      background: #fff;
+    }
+
+    .input-ui:focus {
+      border-color: #f59e0b;
+      box-shadow: 0 0 0 4px rgba(245,158,11,.18);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #f59e0b, #fbbf24);
+      color: #18181b;
+      font-weight: 900;
+      border-radius: 1rem;
+    }
+
+    .btn-dark {
+      background: #18181b;
+      color: white;
+      font-weight: 900;
+      border-radius: 1rem;
+    }
+
+    .form-label {
+      display: block;
+      font-size: .875rem;
+      font-weight: 800;
+      color: #3f3f46;
+      margin-bottom: .5rem;
+    }
+
+    .tab-active {
+      background: linear-gradient(135deg, #f59e0b, #fbbf24) !important;
+      color: #18181b !important;
+      font-weight: 900;
+    }
+
+    .slot input:checked + span {
+      background: #f59e0b;
+      color: #18181b;
+      border-color: #f59e0b;
+      font-weight: 900;
+    }
+
+    .slot input:disabled + span {
+      background: #f4f4f5;
+      color: #a1a1aa;
+      text-decoration: line-through;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+
+<body class="text-zinc-900 min-h-screen flex flex-col">
+
+  <header class="bg-zinc-950 text-white sticky top-0 z-40 shadow-lg">
+    <div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between gap-3">
+      <button onclick="navigate('home')" class="flex items-center gap-3">
+        <span class="w-12 h-12 rounded-2xl bg-amber-500/15 flex items-center justify-center">
+          <i class="ph-fill ph-scissors text-amber-500 text-3xl"></i>
+        </span>
+        <div class="text-left">
+          <h1 class="text-xl sm:text-2xl font-black">BARBER<span class="text-amber-500">SHOP</span></h1>
+          <p class="hidden sm:block text-xs text-zinc-400">Agendamento, admin e financeiro</p>
+        </div>
+      </button>
+
+      <div class="flex items-center gap-2">
+        <button onclick="navigate('admin')" class="text-zinc-300 hover:text-white px-3 py-2 rounded-xl text-sm hover:bg-white/10">
+          <i class="ph ph-lock-key"></i> Admin
+        </button>
+
+        <button onclick="navigate('agendar')" class="btn-primary px-4 py-2">
+          Agendar
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main id="app" class="flex-1"></main>
+
+  <footer class="bg-zinc-950 text-zinc-400 py-8 text-center text-sm mt-10">
+    <strong class="text-white">BARBER<span class="text-amber-500">SHOP</span></strong>
+    <p>© 2026 BarberShop. Todos os direitos reservados.</p>
+  </footer>
+
+  <div id="modal" class="hidden fixed inset-0 bg-black/60 z-50 items-center justify-center p-4"></div>
+
+<script>
+const API = window.location.origin;
+
+let state = {
+  servicos: [],
+  profissionais: [],
+  config: null,
+  token: localStorage.getItem('admin_token') || ''
+};
+
+const $ = sel => document.querySelector(sel);
+
+const money = v => Number(v || 0).toLocaleString('pt-BR', {
+  style: 'currency',
+  currency: 'BRL'
+});
+
+const brDate = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('pt-BR') : '-';
+
+const today = () => new Date().toISOString().slice(0, 10);
+
+const auth = () => ({
+  Authorization: 'Bearer ' + state.token
+});
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+
+function toast(msg, type = 'info') {
+  const t = document.createElement('div');
+  t.className = 'toast ' + type;
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3500);
+}
+
+async function api(url, opt = {}) {
+  const r = await fetch(API + url, {
+    headers: {
+      'Content-Type': 'application/json',
+      ...(opt.headers || {})
+    },
+    ...opt
+  });
+
+  let data = null;
+
+  try {
+    data = await r.json();
+  } catch (e) {}
+
+  if (!r.ok) {
+    throw new Error(data?.erro || 'Erro na requisição');
+  }
+
+  return data;
+}
+
+async function loadBase() {
+  state.config = await api('/api/configuracoes');
+  state.servicos = await api('/api/servicos');
+  state.profissionais = await api('/api/profissionais');
+}
+
+function navigate(view) {
+  if (view === 'home') return renderHome();
+  if (view === 'agendar') return renderAgendar();
+  if (view === 'admin') return renderAdmin();
+}
+
+function serviceOptions(id = '') {
+  return state.servicos.map(s => `
+    <option value="${s.id_servico}" ${String(id) === String(s.id_servico) ? 'selected' : ''}>
+      ${escapeHtml(s.nome_servico)} - ${money(s.preco)} - ${s.duracao_minutos}min
+    </option>
+  `).join('');
+}
+
+function profOptions(id = '') {
+  return `<option value="">Sem preferência</option>` + state.profissionais.map(p => `
+    <option value="${p.id_profissional}" ${String(id) === String(p.id_profissional) ? 'selected' : ''}>
+      ${escapeHtml(p.nome)}
+    </option>
+  `).join('');
+}
+
+async function renderHome() {
+  await loadBase();
+
+  const funcionamento = state.config
+    ? `${state.config.horario_inicio || '09:00'} às ${state.config.horario_fim || '20:00'}`
+    : '09:00 às 20:00';
+
+  $('#app').innerHTML = `
+    <section class="bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-800 text-white px-4 py-16 sm:py-24">
+      <div class="max-w-7xl mx-auto grid lg:grid-cols-2 gap-10 items-center">
+        <div>
+          <span class="inline-flex items-center gap-2 bg-amber-500/15 text-amber-300 px-4 py-2 rounded-full font-bold text-sm mb-6">
+            <i class="ph-fill ph-star"></i> Sistema completo de barbearia
+          </span>
+
+          <h2 class="text-4xl sm:text-6xl font-black leading-tight mb-5">
+            Agendamento fácil e <span class="text-amber-500">controle total</span> no admin.
+          </h2>
+
+          <p class="text-zinc-300 text-lg max-w-2xl mb-8">
+            Escolha serviço, barbeiro, data e horário. O painel administrativo controla agenda, clientes, serviços e financeiro.
+          </p>
+
+          <div class="flex flex-col sm:flex-row gap-3">
+            <button onclick="navigate('agendar')" class="btn-primary px-8 py-4 text-lg">
+              Agendar agora
+            </button>
+
+            <button onclick="navigate('admin')" class="bg-white/10 hover:bg-white/15 text-white font-black px-8 py-4 rounded-2xl">
+              Área Admin
+            </button>
+          </div>
+        </div>
+
+        <div class="glass-card rounded-[2rem] p-6 text-zinc-900">
+          <p class="text-sm text-zinc-500 font-bold">Resumo do sistema</p>
+          <h3 class="text-2xl font-black mb-6">${escapeHtml(state.config?.nome_barbearia || 'BarberShop')}</h3>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div class="bg-zinc-50 rounded-2xl p-4 border">
+              <p class="text-xs text-zinc-500 font-bold">Serviços</p>
+              <strong class="text-3xl">${state.servicos.length}</strong>
+            </div>
+
+            <div class="bg-zinc-50 rounded-2xl p-4 border">
+              <p class="text-xs text-zinc-500 font-bold">Barbeiros</p>
+              <strong class="text-3xl">${state.profissionais.length}</strong>
+            </div>
+
+            <div class="bg-zinc-50 rounded-2xl p-4 border col-span-2">
+              <p class="text-xs text-zinc-500 font-bold">Funcionamento</p>
+              <strong class="text-xl">${funcionamento}</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="max-w-7xl mx-auto px-4 py-12">
+      <div class="mb-8">
+        <p class="text-amber-600 font-black uppercase text-sm">Serviços</p>
+        <h3 class="text-3xl sm:text-4xl font-black">Escolha seu atendimento</h3>
+      </div>
+
+      <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        ${state.servicos.map(s => `
+          <article class="glass-card rounded-3xl p-6 flex flex-col">
+            <div class="flex items-center justify-between mb-4">
+              <div class="w-14 h-14 bg-amber-100 rounded-2xl flex items-center justify-center">
+                <i class="ph-fill ph-scissors text-amber-600 text-3xl"></i>
+              </div>
+
+              <span class="bg-zinc-900 text-white text-xs font-black px-3 py-1 rounded-full">
+                ${s.duracao_minutos} min
+              </span>
+            </div>
+
+            <h4 class="text-xl font-black mb-2">${escapeHtml(s.nome_servico)}</h4>
+
+            <p class="text-zinc-500 text-sm leading-relaxed min-h-12">
+              ${escapeHtml(s.descricao || 'Serviço disponível para agendamento.')}
+            </p>
+
+            <div class="mt-5 flex items-center justify-between border-t pt-4">
+              <span class="text-sm text-zinc-500 font-bold">Valor</span>
+              <strong class="text-2xl text-amber-600">${money(s.preco)}</strong>
+            </div>
+
+            <button onclick="renderAgendar(${s.id_servico})" class="btn-dark mt-5 w-full py-3">
+              Agendar este serviço
+            </button>
+          </article>
+        `).join('')}
+      </div>
+    </section>
+  `;
+}
+
+async function renderAgendar(servicoId = '') {
+  await loadBase();
+
+  $('#app').innerHTML = `
+    <section class="max-w-5xl mx-auto px-4 py-8">
+      <button onclick="navigate('home')" class="text-zinc-500 hover:text-amber-600 mb-5 font-bold">
+        ← Voltar ao início
+      </button>
+
+      <div class="glass-card rounded-3xl p-5 sm:p-8">
+        <h2 class="text-3xl font-black mb-2">Novo agendamento</h2>
+        <p class="text-zinc-500 mb-8">Preencha os dados para marcar o horário.</p>
+
+        <form id="formAg" class="space-y-8">
+          <section>
+            <h3 class="text-xl font-black mb-4">1. Dados do cliente</h3>
+
+            <div class="grid sm:grid-cols-2 gap-4">
+              <label>
+                <span class="form-label">Nome completo</span>
+                <input name="nome" required class="input-ui" placeholder="Ex: João Silva">
+              </label>
+
+              <label>
+                <span class="form-label">WhatsApp</span>
+                <input name="telefone" required class="input-ui" placeholder="Ex: 11999999999">
+              </label>
+            </div>
+
+            <label class="block mt-4">
+              <span class="form-label">E-mail opcional</span>
+              <input name="email" type="email" class="input-ui" placeholder="email@exemplo.com">
+            </label>
+          </section>
+
+          <section>
+            <h3 class="text-xl font-black mb-4">2. Serviço e barbeiro</h3>
+
+            <div class="grid sm:grid-cols-2 gap-4">
+              <label>
+                <span class="form-label">Serviço</span>
+                <select id="servico" name="servico_id" required class="input-ui">
+                  <option value="">Selecione</option>
+                  ${serviceOptions(servicoId)}
+                </select>
+              </label>
+
+              <label>
+                <span class="form-label">Barbeiro</span>
+                <select id="profissional" name="profissional_id" class="input-ui">
+                  ${profOptions()}
+                </select>
+              </label>
+            </div>
+          </section>
+
+          <section>
+            <h3 class="text-xl font-black mb-4">3. Data, pagamento e horário</h3>
+
+            <div class="grid sm:grid-cols-2 gap-4">
+              <label>
+                <span class="form-label">Data</span>
+                <input id="data" name="data" type="date" min="${today()}" required class="input-ui">
+              </label>
+
+              <label>
+                <span class="form-label">Pagamento</span>
+                <select name="forma_pagamento" class="input-ui">
+                  <option value="pix">PIX</option>
+                  <option value="dinheiro">Dinheiro</option>
+                  <option value="cartao">Cartão</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="mt-5">
+              <div class="flex justify-between gap-2 mb-3">
+                <span class="font-black text-zinc-700">Horários disponíveis</span>
+                <small id="statusSlots" class="text-zinc-500 font-bold">Escolha serviço e data</small>
+              </div>
+
+              <div id="slots" class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div class="col-span-full border border-dashed rounded-2xl p-5 text-zinc-500 text-center bg-zinc-50">
+                  Nenhum horário carregado.
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section>
+            <label>
+              <span class="form-label">Observações</span>
+              <textarea name="observacoes" class="input-ui min-h-24" placeholder="Ex: preferência de corte, recado etc."></textarea>
+            </label>
+          </section>
+
+          <button class="btn-primary w-full py-4 text-lg">
+            Confirmar agendamento
+          </button>
+        </form>
+      </div>
+    </section>
+  `;
+
+  ['#servico', '#profissional', '#data'].forEach(s => {
+    const el = $(s);
+    if (el) el.addEventListener('change', loadSlots);
+  });
+
+  $('#formAg').addEventListener('submit', submitAg);
+
+  if (servicoId) loadSlots();
+}
+
+async function loadSlots() {
+  const serv = $('#servico')?.value;
+  const data = $('#data')?.value;
+  const prof = $('#profissional')?.value;
+
+  if (!serv || !data) return;
+
+  $('#statusSlots').textContent = 'Carregando horários...';
+
+  try {
+    const slots = await api(`/api/horarios?data=${data}&servico_id=${serv}&profissional_id=${prof || ''}`);
+
+    $('#slots').innerHTML = slots.length
+      ? slots.map(x => `
+        <label class="slot">
+          <input type="radio" name="hora" value="${x.hora}" class="hidden" ${x.disponivel ? '' : 'disabled'}>
+          <span title="${escapeHtml(x.motivo || '')}" class="block text-center border rounded-2xl p-3 cursor-pointer bg-white hover:border-amber-400">
+            ${x.hora}
+          </span>
+        </label>
+      `).join('')
+      : '<div class="col-span-full border rounded-2xl p-5 text-center text-red-500 bg-red-50">Nenhum horário disponível.</div>';
+
+    $('#statusSlots').textContent = slots.some(s => s.disponivel)
+      ? 'Selecione um horário livre'
+      : 'Nenhum horário disponível';
+  } catch (err) {
+    toast(err.message, 'error');
+    $('#statusSlots').textContent = 'Erro ao carregar';
+  }
+}
+
+async function submitAg(e) {
+  e.preventDefault();
+
+  const fd = new FormData(e.target);
+  const hora = fd.get('hora');
+
+  if (!hora) {
+    return toast('Selecione um horário.', 'error');
+  }
+
+  const body = {
+    cliente: {
+      nome: fd.get('nome'),
+      telefone: fd.get('telefone'),
+      email: fd.get('email')
+    },
+    servico_id: fd.get('servico_id'),
+    profissional_id: fd.get('profissional_id'),
+    data: fd.get('data'),
+    hora,
+    forma_pagamento: fd.get('forma_pagamento'),
+    observacoes: fd.get('observacoes')
+  };
+
+  try {
+    const r = await api('/api/agendamentos', {
+      method: 'POST',
+      body: JSON.stringify(body)
+    });
+
+    toast('Agendamento criado com sucesso!', 'success');
+    showConfirm(body, r.agendamento);
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+}
+
+function showConfirm(body) {
+  const serv = state.servicos.find(s => String(s.id_servico) === String(body.servico_id));
+  const prof = state.profissionais.find(p => String(p.id_profissional) === String(body.profissional_id));
+
+  const msg = `Olá ${body.cliente.nome}! Seu horário na ${state.config.nome_barbearia} foi registrado para ${brDate(body.data)} às ${body.hora}. Serviço: ${serv?.nome_servico || '-'}. Valor: ${money(serv?.preco || 0)}.`;
+
+  $('#modal').className = 'fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4';
+
+  $('#modal').innerHTML = `
+    <div class="bg-white max-w-md w-full rounded-[2rem] p-6 text-center shadow-2xl">
+      <div class="w-20 h-20 mx-auto rounded-full bg-green-100 flex items-center justify-center mb-4">
+        <i class="ph-fill ph-check-circle text-green-500 text-6xl"></i>
+      </div>
+
+      <h3 class="text-2xl font-black">Agendamento registrado!</h3>
+
+      <div class="bg-zinc-50 rounded-2xl p-4 text-left mt-5 text-sm space-y-2 border">
+        <p><b>Cliente:</b> ${escapeHtml(body.cliente.nome)}</p>
+        <p><b>Serviço:</b> ${escapeHtml(serv?.nome_servico || '-')}</p>
+        <p><b>Barbeiro:</b> ${escapeHtml(prof?.nome || 'Sem preferência')}</p>
+        <p><b>Data:</b> ${brDate(body.data)} às ${body.hora}</p>
+        <p><b>Valor:</b> ${money(serv?.preco || 0)}</p>
+      </div>
+
+      <a target="_blank" href="https://wa.me/?text=${encodeURIComponent(msg)}" class="block mt-4 bg-green-500 hover:bg-green-600 text-white font-black py-3 rounded-2xl">
+        Enviar WhatsApp
+      </a>
+
+      <button onclick="$('#modal').className='hidden fixed inset-0';navigate('home')" class="mt-3 w-full btn-primary py-3">
+        Voltar ao início
+      </button>
+    </div>
+  `;
+}
+
+async function renderAdmin() {
+  if (!state.token) return renderLogin();
+
+  await loadBase();
+
+  $('#app').innerHTML = `
+    <section class="max-w-7xl mx-auto px-4 py-6">
+      <div class="mb-6 glass-card rounded-3xl p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <p class="text-amber-600 font-black text-sm uppercase">Painel administrativo</p>
+          <h2 class="text-3xl font-black">Controle da barbearia</h2>
+          <p class="text-zinc-500">Gerencie agenda, serviços, barbeiros, clientes e configurações.</p>
+        </div>
+
+        <button onclick="logout()" class="bg-red-50 hover:bg-red-100 text-red-700 font-black px-4 py-3 rounded-2xl">
+          Sair
+        </button>
+      </div>
+
+      <div class="grid lg:grid-cols-[260px_1fr] gap-6">
+        <aside class="bg-zinc-950 text-white rounded-[2rem] p-4 h-fit">
+          ${['dashboard','agendamentos','servicos','profissionais','clientes','configuracoes'].map((t, i) => `
+            <button onclick="adminTab('${t}')" id="tab-${t}" class="w-full text-left px-4 py-3 rounded-2xl mb-2 hover:bg-zinc-800 ${i === 0 ? 'tab-active' : ''}">
+              ${labelTab(t)}
+            </button>
+          `).join('')}
+        </aside>
+
+        <div id="adminContent" class="min-w-0"></div>
+      </div>
+    </section>
+  `;
+
+  adminTab('dashboard');
+}
+
+function renderLogin() {
+  $('#app').innerHTML = `
+    <section class="max-w-3xl mx-auto px-4 py-10">
+      <button onclick="navigate('home')" class="text-zinc-500 hover:text-amber-600 mb-4 font-bold">
+        ← Voltar ao início
+      </button>
+
+      <div class="glass-card rounded-[2rem] overflow-hidden">
+        <div class="bg-zinc-950 text-white px-6 py-5">
+          <h2 class="text-2xl font-black">Acesso Administrativo</h2>
+          <p class="text-zinc-400 text-sm">Usuário padrão: admin1 | Senha: 1234</p>
+        </div>
+
+        <form id="login" class="p-5 grid md:grid-cols-[1fr_1fr_auto] gap-4 items-end">
+          <label>
+            <span class="form-label">Usuário</span>
+            <input name="usuario" class="input-ui" required placeholder="admin1">
+          </label>
+
+          <label>
+            <span class="form-label">Senha</span>
+            <input name="senha" type="password" class="input-ui" required placeholder="1234">
+          </label>
+
+          <button class="btn-primary px-6 py-3 h-[52px]">Entrar</button>
+        </form>
+      </div>
+    </section>
+  `;
+
+  $('#login').addEventListener('submit', async e => {
+    e.preventDefault();
+
+    const fd = new FormData(e.target);
+
+    try {
+      const r = await api('/api/login', {
+        method: 'POST',
+        body: JSON.stringify({
+          usuario: fd.get('usuario'),
+          senha: fd.get('senha')
+        })
+      });
+
+      state.token = r.token;
+      localStorage.setItem('admin_token', r.token);
+
+      toast('Login realizado!', 'success');
+      renderAdmin();
+    } catch (err) {
+      toast(err.message, 'error');
+    }
+  });
+}
+
+function logout() {
+  state.token = '';
+  localStorage.removeItem('admin_token');
+  toast('Você saiu do admin.', 'info');
+  renderLogin();
+}
+
+function labelTab(t) {
+  return {
+    dashboard: 'Dashboard',
+    agendamentos: 'Agendamentos',
+    servicos: 'Serviços',
+    profissionais: 'Barbeiros',
+    clientes: 'Clientes',
+    configuracoes: 'Configurações'
+  }[t] || t;
+}
+
+function setActive(t) {
+  document.querySelectorAll('[id^="tab-"]').forEach(b => b.classList.remove('tab-active'));
+  $('#tab-' + t)?.classList.add('tab-active');
+}
+
+async function adminTab(t) {
+  setActive(t);
+
+  if (t === 'dashboard') return dash();
+  if (t === 'agendamentos') return ags();
+  if (t === 'servicos') return servAdmin();
+  if (t === 'profissionais') return profAdmin();
+  if (t === 'clientes') return clientesAdmin();
+  if (t === 'configuracoes') return configAdmin();
+}
+
+async function dash() {
+  const d = await api('/api/dashboard', {
+    headers: auth()
+  });
+
+  $('#adminContent').innerHTML = `
+    <div class="mb-5">
+      <h2 class="text-3xl font-black">Dashboard</h2>
+      <p class="text-zinc-500">Resumo financeiro e desempenho dos serviços.</p>
+    </div>
+
+    <div class="grid sm:grid-cols-3 gap-4 mb-6">
+      ${metricCard('Receita hoje', money(d.hoje.receita), `${d.hoje.qtd} agendamentos`)}
+      ${metricCard('Receita semana', money(d.semana.receita), `${d.semana.qtd} agendamentos`)}
+      ${metricCard('Receita mês', money(d.mes.receita), `${d.mes.qtd} agendamentos`)}
+    </div>
+
+    <div class="grid lg:grid-cols-2 gap-5">
+      <div class="glass-card rounded-3xl p-5">
+        <h3 class="font-black text-xl mb-3">Por pagamento</h3>
+        ${d.pagamentos.map(p => `
+          <div class="flex justify-between border-b last:border-0 py-3">
+            <span class="font-bold text-zinc-600">${escapeHtml(p.forma_pagamento)}</span>
+            <b>${money(p.total)}</b>
+          </div>
+        `).join('') || '<p class="text-zinc-500">Sem dados.</p>'}
+      </div>
+
+      <div class="glass-card rounded-3xl p-5">
+        <h3 class="font-black text-xl mb-3">Serviços mais vendidos</h3>
+        ${d.servicosMaisVendidos.map(s => `
+          <div class="flex justify-between border-b last:border-0 py-3">
+            <span class="font-bold text-zinc-600">${escapeHtml(s.nome_servico)}</span>
+            <b>${s.qtd}x</b>
+          </div>
+        `).join('') || '<p class="text-zinc-500">Sem dados.</p>'}
+      </div>
+    </div>
+  `;
+}
+
+function metricCard(title, value, subtitle) {
+  return `
+    <div class="glass-card rounded-3xl p-5">
+      <p class="text-zinc-500 font-bold">${title}</p>
+      <b class="block text-3xl font-black my-1">${value}</b>
+      <small class="text-zinc-400 font-bold">${subtitle}</small>
+    </div>
+  `;
+}
+
+async function ags() {
+  const rows = await api('/api/agendamentos', {
+    headers: auth()
+  });
+
+  $('#adminContent').innerHTML = `
+    <div class="flex flex-wrap justify-between items-end gap-3 mb-5">
+      <div>
+        <h2 class="text-3xl font-black">Agendamentos</h2>
+        <p class="text-zinc-500">Altere status, remarque ou cancele.</p>
+      </div>
+
+      <a href="/api/export/agendamentos.csv?token=${state.token}" class="bg-green-600 hover:bg-green-700 text-white font-black px-4 py-3 rounded-2xl">
+        Exportar CSV
+      </a>
+    </div>
+
+    <div class="space-y-4">
+      ${rows.map(a => cardAg(a)).join('') || '<div class="glass-card rounded-3xl p-8 text-center text-zinc-500">Nenhum agendamento.</div>'}
+    </div>
+  `;
+}
+
+function cardAg(a) {
+  return `
+    <div class="glass-card rounded-3xl p-5">
+      <div class="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-4">
+        <div>
+          <span class="inline-flex px-3 py-1 rounded-full text-xs font-black ${statusClass(a.status)}">
+            ${statusLabel(a.status)}
+          </span>
+
+          <h3 class="text-xl font-black mt-2">${escapeHtml(a.cliente_nome)}</h3>
+
+          <p class="text-zinc-500">
+            ${escapeHtml(a.cliente_telefone)} • ${escapeHtml(a.cliente_email || '-')}
+          </p>
+
+          <div class="mt-3 grid sm:grid-cols-2 gap-2 text-sm">
+            <p><b>Serviço:</b> ${escapeHtml(a.nome_servico)}</p>
+            <p><b>Barbeiro:</b> ${escapeHtml(a.profissional_nome || 'Sem preferência')}</p>
+            <p><b>Data:</b> ${brDate(a.data_agendamento)} às ${a.hora_agendamento}</p>
+            <p><b>Valor:</b> ${money(a.valor_total)}</p>
+            <p><b>Pagamento:</b> ${escapeHtml(a.forma_pagamento)}</p>
+            <p><b>Obs:</b> ${escapeHtml(a.observacoes || '-')}</p>
+          </div>
+        </div>
+
+        <div class="grid sm:grid-cols-2 xl:grid-cols-1 gap-2 xl:w-64 shrink-0">
+          <select onchange="changeStatus(${a.id_agendamento}, this.value)" class="input-ui py-2">
+            ${['pendente','confirmado','cancelado','concluido','nao_compareceu'].map(s => `
+              <option value="${s}" ${s === a.status ? 'selected' : ''}>
+                ${statusLabel(s)}
+              </option>
+            `).join('')}
+          </select>
+
+          <button onclick="editAg(${a.id_agendamento})" class="bg-blue-50 hover:bg-blue-100 text-blue-700 font-black rounded-xl p-2">
+            Editar
+          </button>
+
+          <button onclick="zap(${a.id_agendamento})" class="bg-green-50 hover:bg-green-100 text-green-700 font-black rounded-xl p-2">
+            WhatsApp
+          </button>
+
+          <button onclick="delAg(${a.id_agendamento})" class="bg-red-50 hover:bg-red-100 text-red-700 font-black rounded-xl p-2">
+            Cancelar
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function statusClass(s) {
+  return {
+    pendente: 'bg-yellow-100 text-yellow-700',
+    confirmado: 'bg-blue-100 text-blue-700',
+    cancelado: 'bg-red-100 text-red-700',
+    concluido: 'bg-green-100 text-green-700',
+    nao_compareceu: 'bg-zinc-200 text-zinc-700'
+  }[s] || 'bg-zinc-100 text-zinc-700';
+}
+
+function statusLabel(s) {
+  return {
+    pendente: 'PENDENTE',
+    confirmado: 'CONFIRMADO',
+    cancelado: 'CANCELADO',
+    concluido: 'CONCLUÍDO',
+    nao_compareceu: 'NÃO COMPARECEU'
+  }[s] || s;
+}
+
+async function changeStatus(id, status) {
+  try {
+    await api('/api/agendamentos/' + id + '/status', {
+      method: 'PATCH',
+      headers: auth(),
+      body: JSON.stringify({ status })
+    });
+
+    toast('Status alterado.', 'success');
+    ags();
+  } catch (e) {
+    toast(e.message, 'error');
+  }
+}
+
+async function delAg(id) {
+  if (!confirm('Cancelar este agendamento?')) return;
+
+  try {
+    await api('/api/agendamentos/' + id, {
+      method: 'DELETE',
+      headers: auth()
+    });
+
+    toast('Agendamento cancelado.', 'success');
+    ags();
+  } catch (e) {
+    toast(e.message, 'error');
+  }
+}
+
+async function editAg(id) {
+  const rows = await api('/api/agendamentos', {
+    headers: auth()
+  });
+
+  const a = rows.find(x => Number(x.id_agendamento) === Number(id));
+
+  if (!a) {
+    return toast('Agendamento não encontrado.', 'error');
+  }
+
+  await loadBase();
+
+  $('#modal').className = 'fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4';
+
+  $('#modal').innerHTML = `
+    <div class="bg-white max-w-2xl w-full max-h-[90vh] overflow-auto rounded-[2rem] p-6 shadow-2xl">
+      <h3 class="text-2xl font-black mb-1">Editar agendamento</h3>
+      <p class="text-zinc-500 mb-5">Atualize os dados do agendamento.</p>
+
+      <form id="editForm" class="space-y-3">
+        <div class="grid sm:grid-cols-2 gap-3">
+          <input name="nome" value="${escapeHtml(a.cliente_nome)}" class="input-ui" placeholder="Nome">
+          <input name="telefone" value="${escapeHtml(a.cliente_telefone)}" class="input-ui" placeholder="Telefone">
+        </div>
+
+        <input name="email" value="${escapeHtml(a.cliente_email || '')}" class="input-ui" placeholder="E-mail">
+
+        <div class="grid sm:grid-cols-2 gap-3">
+          <select name="fk_servico" class="input-ui">
+            ${serviceOptions(a.fk_servico)}
+          </select>
+
+          <select name="fk_profissional" class="input-ui">
+            ${profOptions(a.fk_profissional || '')}
+          </select>
+        </div>
+
+        <div class="grid sm:grid-cols-2 gap-3">
+          <input type="date" name="data_agendamento" value="${a.data_agendamento}" class="input-ui">
+          <input type="time" name="hora_agendamento" value="${a.hora_agendamento}" class="input-ui">
+        </div>
+
+        <select name="status" class="input-ui">
+          ${['pendente','confirmado','cancelado','concluido','nao_compareceu'].map(s => `
+            <option value="${s}" ${s === a.status ? 'selected' : ''}>
+              ${statusLabel(s)}
+            </option>
+          `).join('')}
+        </select>
+
+        <textarea name="observacoes" class="input-ui min-h-24">${escapeHtml(a.observacoes || '')}</textarea>
+
+        <div class="grid sm:grid-cols-2 gap-3 pt-2">
+          <button class="btn-primary p-3">Salvar alterações</button>
+          <button type="button" onclick="$('#modal').className='hidden fixed inset-0'" class="bg-zinc-200 hover:bg-zinc-300 font-black p-3 rounded-2xl">
+            Cancelar
+          </button>
+        </div>
+      </form>
+    </div>
+  `;
+
+  $('#editForm').addEventListener('submit', async e => {
+    e.preventDefault();
+
+    const fd = new FormData(e.target);
+
+    const body = {
+      cliente: {
+        nome: fd.get('nome'),
+        telefone: fd.get('telefone'),
+        email: fd.get('email')
+      },
+      fk_servico: fd.get('fk_servico'),
+      fk_profissional: fd.get('fk_profissional'),
+      data_agendamento: fd.get('data_agendamento'),
+      hora_agendamento: fd.get('hora_agendamento'),
+      status: fd.get('status'),
+      observacoes: fd.get('observacoes'),
+      forma_pagamento: a.forma_pagamento
+    };
+
+    try {
+      await api('/api/agendamentos/' + id, {
+        method: 'PUT',
+        headers: auth(),
+        body: JSON.stringify(body)
+      });
+
+      $('#modal').className = 'hidden fixed inset-0';
+      toast('Agendamento atualizado.', 'success');
+      ags();
+    } catch (err) {
+      toast(err.message, 'error');
+    }
+  });
+}
+
+async function zap(id) {
+  const rows = await api('/api/agendamentos', {
+    headers: auth()
+  });
+
+  const a = rows.find(x => Number(x.id_agendamento) === Number(id));
+
+  if (!a) {
+    return toast('Agendamento não encontrado.', 'error');
+  }
+
+  const txt = `Olá ${a.cliente_nome}! Seu horário na ${state.config?.nome_barbearia || 'BarberShop'} foi confirmado para ${brDate(a.data_agendamento)} às ${a.hora_agendamento}. Serviço: ${a.nome_servico}. Valor: ${money(a.valor_total)}.`;
+
+  window.open(
+    'https://wa.me/55' + String(a.cliente_telefone).replace(/\D/g, '') + '?text=' + encodeURIComponent(txt),
+    '_blank'
+  );
+}
+
+async function servAdmin() {
+  await loadBase();
+
+  $('#adminContent').innerHTML = `
+    <div class="mb-5">
+      <h2 class="text-3xl font-black">Serviços</h2>
+      <p class="text-zinc-500">Cadastre, edite preço, duração e descrição.</p>
+    </div>
+
+    <form id="servForm" class="glass-card rounded-3xl p-5 grid md:grid-cols-5 gap-3 mb-5">
+      <input name="nome_servico" placeholder="Nome" class="input-ui" required>
+      <input name="preco" type="number" step="0.01" placeholder="Preço" class="input-ui" required>
+      <input name="duracao_minutos" type="number" placeholder="Duração min" class="input-ui" required>
+      <input name="descricao" placeholder="Descrição" class="input-ui">
+      <button class="btn-primary px-4">Cadastrar</button>
+    </form>
+
+    <div class="space-y-3">
+      ${state.servicos.map(s => `
+        <div class="glass-card rounded-2xl p-4 grid md:grid-cols-[1fr_auto_auto_auto] gap-3 items-center">
+          <div>
+            <b>${escapeHtml(s.nome_servico)}</b>
+            <p class="text-sm text-zinc-500">${escapeHtml(s.descricao || '-')}</p>
+          </div>
+
+          <span>${money(s.preco)}</span>
+          <span>${s.duracao_minutos} min</span>
+
+          <button onclick="delServico(${s.id_servico})" class="bg-red-50 text-red-700 font-black px-3 py-2 rounded-xl">
+            Remover
+          </button>
+        </div>
+      `).join('')}
+    </div>
+  `;
+
+  $('#servForm').addEventListener('submit', async e => {
+    e.preventDefault();
+
+    const fd = new FormData(e.target);
+
+    try {
+      await api('/api/servicos', {
+        method: 'POST',
+        headers: auth(),
+        body: JSON.stringify({
+          nome_servico: fd.get('nome_servico'),
+          preco: fd.get('preco'),
+          duracao_minutos: fd.get('duracao_minutos'),
+          descricao: fd.get('descricao')
+        })
+      });
+
+      toast('Serviço cadastrado.', 'success');
+      servAdmin();
+    } catch (err) {
+      toast(err.message, 'error');
+    }
+  });
+}
+
+async function delServico(id) {
+  if (!confirm('Remover este serviço?')) return;
+
+  try {
+    await api('/api/servicos/' + id, {
+      method: 'DELETE',
+      headers: auth()
+    });
+
+    toast('Serviço removido.', 'success');
+    servAdmin();
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+}
+
+async function profAdmin() {
+  await loadBase();
+
+  $('#adminContent').innerHTML = `
+    <div class="mb-5">
+      <h2 class="text-3xl font-black">Barbeiros</h2>
+      <p class="text-zinc-500">Cadastre e gerencie os profissionais.</p>
+    </div>
+
+    <form id="profForm" class="glass-card rounded-3xl p-5 grid md:grid-cols-4 gap-3 mb-5">
+      <input name="nome" placeholder="Nome" class="input-ui" required>
+      <input name="especialidade" placeholder="Especialidade" class="input-ui">
+      <input name="comissao_percentual" type="number" placeholder="Comissão %" class="input-ui">
+      <button class="btn-primary px-4">Cadastrar</button>
+    </form>
+
+    <div class="space-y-3">
+      ${state.profissionais.map(p => `
+        <div class="glass-card rounded-2xl p-4 grid md:grid-cols-[1fr_auto_auto] gap-3 items-center">
+          <div>
+            <b>${escapeHtml(p.nome)}</b>
+            <p class="text-sm text-zinc-500">${escapeHtml(p.especialidade || '-')}</p>
+          </div>
+
+          <span>${Number(p.comissao_percentual || 0)}%</span>
+
+          <button onclick="delProf(${p.id_profissional})" class="bg-red-50 text-red-700 font-black px-3 py-2 rounded-xl">
+            Remover
+          </button>
+        </div>
+      `).join('')}
+    </div>
+  `;
+
+  $('#profForm').addEventListener('submit', async e => {
+    e.preventDefault();
+
+    const fd = new FormData(e.target);
+
+    try {
+      await api('/api/profissionais', {
+        method: 'POST',
+        headers: auth(),
+        body: JSON.stringify({
+          nome: fd.get('nome'),
+          especialidade: fd.get('especialidade'),
+          comissao_percentual: fd.get('comissao_percentual')
+        })
+      });
+
+      toast('Barbeiro cadastrado.', 'success');
+      profAdmin();
+    } catch (err) {
+      toast(err.message, 'error');
+    }
+  });
+}
+
+async function delProf(id) {
+  if (!confirm('Remover este barbeiro?')) return;
+
+  try {
+    await api('/api/profissionais/' + id, {
+      method: 'DELETE',
+      headers: auth()
+    });
+
+    toast('Barbeiro removido.', 'success');
+    profAdmin();
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+}
+
+async function clientesAdmin() {
+  const clientes = await api('/api/clientes', {
+    headers: auth()
+  });
+
+  $('#adminContent').innerHTML = `
+    <div class="mb-5">
+      <h2 class="text-3xl font-black">Clientes</h2>
+      <p class="text-zinc-500">Lista de clientes cadastrados.</p>
+    </div>
+
+    <div class="space-y-3">
+      ${clientes.map(c => `
+        <div class="glass-card rounded-2xl p-4 grid md:grid-cols-[1fr_auto_auto] gap-3 items-center">
+          <div>
+            <b>${escapeHtml(c.nome)}</b>
+            <p class="text-sm text-zinc-500">${escapeHtml(c.telefone)} • ${escapeHtml(c.email || '-')}</p>
+          </div>
+
+          <span>${c.qtd_agendamentos || 0} agendamentos</span>
+
+          <button onclick="delCliente(${c.id_cliente})" class="bg-red-50 text-red-700 font-black px-3 py-2 rounded-xl">
+            Remover
+          </button>
+        </div>
+      `).join('') || '<div class="glass-card rounded-3xl p-8 text-center text-zinc-500">Nenhum cliente.</div>'}
+    </div>
+  `;
+}
+
+async function delCliente(id) {
+  if (!confirm('Remover este cliente?')) return;
+
+  try {
+    await api('/api/clientes/' + id, {
+      method: 'DELETE',
+      headers: auth()
+    });
+
+    toast('Cliente removido.', 'success');
+    clientesAdmin();
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+}
+
+async function configAdmin() {
+  await loadBase();
+
+  const c = state.config || {};
+
+  $('#adminContent').innerHTML = `
+    <div class="mb-5">
+      <h2 class="text-3xl font-black">Configurações</h2>
+      <p class="text-zinc-500">Personalize as informações da barbearia.</p>
+    </div>
+
+    <form id="configForm" class="glass-card rounded-3xl p-5 space-y-4">
+      <div class="grid sm:grid-cols-2 gap-4">
+        <label>
+          <span class="form-label">Nome da barbearia</span>
+          <input name="nome_barbearia" value="${escapeHtml(c.nome_barbearia || '')}" class="input-ui">
+        </label>
+
+        <label>
+          <span class="form-label">Telefone</span>
+          <input name="telefone" value="${escapeHtml(c.telefone || '')}" class="input-ui">
+        </label>
+      </div>
+
+      <label>
+        <span class="form-label">Endereço</span>
+        <input name="endereco" value="${escapeHtml(c.endereco || '')}" class="input-ui">
+      </label>
+
+      <div class="grid sm:grid-cols-3 gap-4">
+        <label>
+          <span class="form-label">Abertura</span>
+          <input name="horario_inicio" type="time" value="${escapeHtml(c.horario_inicio || '09:00')}" class="input-ui">
+        </label>
+
+        <label>
+          <span class="form-label">Fechamento</span>
+          <input name="horario_fim" type="time" value="${escapeHtml(c.horario_fim || '20:00')}" class="input-ui">
+        </label>
+
+        <label>
+          <span class="form-label">Intervalo em minutos</span>
+          <input name="intervalo_minutos" type="number" value="${escapeHtml(c.intervalo_minutos || 30)}" class="input-ui">
+        </label>
+      </div>
+
+      <label class="flex items-center gap-2 font-bold">
+        <input type="checkbox" name="segunda_funciona" value="1" ${Number(c.segunda_funciona) === 1 ? 'checked' : ''}>
+        Funciona na segunda-feira
+      </label>
+
+      <button class="btn-primary px-6 py-3">
+        Salvar configurações
+      </button>
+    </form>
+
+    <form id="credForm" class="glass-card rounded-3xl p-5 space-y-4 mt-6">
+      <h3 class="text-xl font-black">Alterar login do admin</h3>
+
+      <div class="grid sm:grid-cols-2 gap-4">
+        <input name="usuarioAtual" class="input-ui" placeholder="Usuário atual">
+        <input name="senhaAtual" type="password" class="input-ui" placeholder="Senha atual">
+        <input name="novoUsuario" class="input-ui" placeholder="Novo usuário">
+        <input name="novaSenha" type="password" class="input-ui" placeholder="Nova senha">
+      </div>
+
+      <button class="btn-dark px-6 py-3">
+        Alterar credenciais
+      </button>
+    </form>
+  `;
+
+  $('#configForm').addEventListener('submit', async e => {
+    e.preventDefault();
+
+    const fd = new FormData(e.target);
+
+    try {
+      await api('/api/configuracoes', {
+        method: 'PUT',
+        headers: auth(),
+        body: JSON.stringify({
+          nome_barbearia: fd.get('nome_barbearia'),
+          telefone: fd.get('telefone'),
+          endereco: fd.get('endereco'),
+          horario_inicio: fd.get('horario_inicio'),
+          horario_fim: fd.get('horario_fim'),
+          intervalo_minutos: fd.get('intervalo_minutos'),
+          segunda_funciona: fd.get('segunda_funciona') ? 1 : 0
+        })
+      });
+
+      toast('Configurações salvas.', 'success');
+      configAdmin();
+    } catch (err) {
+      toast(err.message, 'error');
+    }
+  });
+
+  $('#credForm').addEventListener('submit', async e => {
+    e.preventDefault();
+
+    const fd = new FormData(e.target);
+
+    try {
+      await api('/api/admin/credenciais', {
+        method: 'POST',
+        headers: auth(),
+        body: JSON.stringify({
+          usuarioAtual: fd.get('usuarioAtual'),
+          senhaAtual: fd.get('senhaAtual'),
+          novoUsuario: fd.get('novoUsuario'),
+          novaSenha: fd.get('novaSenha')
+        })
+      });
+
+      toast('Login alterado. Entre novamente.', 'success');
+      logout();
+    } catch (err) {
+      toast(err.message, 'error');
+    }
+  });
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  renderHome().catch(err => {
+    $('#app').innerHTML = `
+      <section class="max-w-3xl mx-auto px-4 py-10">
+        <div class="glass-card rounded-3xl p-6 text-center">
+          <h2 class="text-2xl font-black text-red-600 mb-2">Erro ao conectar no servidor</h2>
+          <p class="text-zinc-500">${escapeHtml(err.message)}</p>
+          <p class="mt-4 text-sm text-zinc-400">
+            Rode no terminal: npm install express cors sqlite3 && node server.js
+          </p>
+        </div>
+      </section>
+    `;
+  });
+});
+</script>
+
+</body>
+</html>
